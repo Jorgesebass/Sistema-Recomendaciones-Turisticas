@@ -1,0 +1,50 @@
+id,destino,pais,nombre,categoria,descripcion,costo_usd,nivel_presupuesto,franja_recomendada,duracion_horas,accesible,apto_vegetariano,etiquetas,rating
+1,Quito,Ecuador,Centro Histórico de Quito,Cultura e historia,"Recorrido a pie por plazas, iglesias coloniales y la Plaza Grande, Patrimonio de la Humanidad.",0,economico,mañana,3,parcial,si,patrimonio;caminata;colonial;fotografia,4.8
+2,Quito,Ecuador,Iglesia de la Compañía de Jesús,Cultura e historia,Templo barroco con interiores cubiertos de pan de oro; visita guiada.,5,economico,mañana,1,si,si,arte;barroco;iglesia,4.9
+3,Quito,Ecuador,TelefériQo y Volcán Pichincha,Aventura,Teleférico hasta 3.945 m y caminata opcional hacia el Rucu Pichincha.,9,economico,mañana,4,parcial,si,montaña;senderismo;miradores;altura,4.6
+4,Quito,Ecuador,Mitad del Mundo y Museo Intiñán,Cultura e historia,Monumento ecuatorial y museo interactivo sobre la línea equinoccial.,12,economico,tarde,3,si,si,ciencia;museo;ecuador;familia,4.4
+5,Quito,Ecuador,Mercado Central de Quito,Gastronomía,"Almuerzo típico: locro de papa, encebollado y jugos de frutas andinas.",8,economico,tarde,1.5,si,si,comida tipica;mercado;locro;local,4.5
+6,Quito,Ecuador,Calle La Ronda de noche,Gastronomía,"Calle bohemia con canelazo, empanadas de viento y música en vivo.",15,economico,noche,2.5,parcial,si,vida nocturna;musica;bohemio;canelazo,4.6
+7,Quito,Ecuador,Restaurante de autor en La Floresta,Gastronomía,Menú degustación con ingredientes andinos contemporáneos; opción vegetariana.,75,lujo,noche,2.5,si,si,alta cocina;degustacion;andino;vino,4.8
+8,Quito,Ecuador,Parque Metropolitano Guangüiltagua,Aire libre,"Bosque urbano con senderos, miradores al volcán Cotopaxi y ciclismo.",0,economico,mañana,3,parcial,si,naturaleza;senderos;bicicleta;picnic,4.7
+9,Quito,Ecuador,Spa termal en Papallacta (excursión),Relax,"Excursión de día a piscinas termales de origen volcánico a 1,5 h de Quito.",45,medio,tarde,5,parcial,si,termas;spa;descanso;volcan,4.7
+10,Quito,Ecuador,Museo Casa del Alabado,Cultura e historia,Arte precolombino ecuatoriano en una casona colonial restaurada.,6,economico,tarde,1.5,si,si,museo;precolombino;arqueologia,4.8
+11,Cuenca,Ecuador,Catedral de la Inmaculada Concepción,Cultura e historia,Catedral nueva de cúpulas azules; subida a la terraza con vista panorámica.,3,economico,mañana,1.5,parcial,si,patrimonio;arquitectura;miradores,4.8
+12,Cuenca,Ecuador,Parque Nacional Cajas,Aire libre,Páramo con más de 200 lagunas; rutas de senderismo de dificultad variable.,0,economico,mañana,5,no,si,naturaleza;lagunas;senderismo;paramo,4.9
+13,Cuenca,Ecuador,Museo Pumapungo,Cultura e historia,"Ruinas incas, jardín etnobotánico y sala etnográfica del Ecuador.",0,economico,tarde,2,si,si,inca;museo;arqueologia;jardin,4.7
+14,Cuenca,Ecuador,Mercado 10 de Agosto,Gastronomía,"Hornado, mote pillo y jugos; experiencia local y económica.",6,economico,tarde,1.5,parcial,no,comida tipica;mercado;hornado,4.4
+15,Cuenca,Ecuador,Baños termales de Cuenca,Relax,"Piscinas termales, baños de cajón y masajes en la parroquia Baños.",30,medio,tarde,3,si,si,termas;spa;masaje;descanso,4.6
+16,Cuenca,Ecuador,Cena en el Barranco del Tomebamba,Gastronomía,Restaurante con vista al río; cocina ecuatoriana fusión.,35,medio,noche,2,parcial,si,romantico;rio;fusion;vista,4.6
+17,Cuenca,Ecuador,Taller de sombrero de paja toquilla,Cultura e historia,Visita a fábrica artesanal del sombrero declarado Patrimonio Inmaterial.,0,economico,mañana,1.5,si,si,artesania;compras;tradicion,4.5
+18,Baños,Ecuador,Ruta de las Cascadas en bicicleta,Aventura,Descenso en bicicleta hasta el Pailón del Diablo por la vía a Puyo.,15,economico,mañana,4,no,si,bicicleta;cascadas;adrenalina,4.8
+19,Baños,Ecuador,Casa del Árbol y columpio,Aire libre,Columpio sobre el vacío con vista al volcán Tungurahua.,3,economico,tarde,2,no,si,miradores;fotografia;volcan,4.3
+20,Baños,Ecuador,Rafting en el río Pastaza,Aventura,Rafting clase III-IV con guía certificado y equipo incluido.,35,medio,mañana,4,no,si,rafting;rio;adrenalina;deporte,4.8
+21,Baños,Ecuador,Termas de la Virgen,Relax,Piscinas termales al pie de la cascada en el centro de Baños.,4,economico,noche,2,parcial,si,termas;descanso;noche,4.2
+22,Baños,Ecuador,Puenting y canopy,Aventura,Salto desde el puente San Francisco y tirolesa sobre el cañón.,25,medio,tarde,2,no,si,puenting;canopy;adrenalina,4.6
+23,Baños,Ecuador,Café y melcochas en el centro,Gastronomía,Degustación de melcocha artesanal y café local; opciones veganas.,6,economico,tarde,1,si,si,dulces;cafe;tradicion,4.4
+24,Baños,Ecuador,Spa de lujo con vista al volcán,Relax,"Circuito hidrotermal, masaje con piedras volcánicas y cena saludable.",120,lujo,tarde,4,si,si,spa;bienestar;lujo;masaje,4.9
+25,Galápagos,Ecuador,Estación Científica Charles Darwin,Cultura e historia,Centro de crianza de tortugas gigantes en Puerto Ayora.,0,economico,mañana,2,si,si,tortugas;ciencia;conservacion,4.6
+26,Galápagos,Ecuador,Bahía Tortuga,Aire libre,"Playa de arena blanca con iguanas marinas; caminata de 2,5 km.",0,economico,mañana,3,parcial,si,playa;iguanas;naturaleza;snorkel,4.9
+27,Galápagos,Ecuador,Tour de snorkel en Kicker Rock,Aventura,"Snorkel con lobos marinos, tortugas y tiburones de arrecife.",160,lujo,mañana,8,no,si,snorkel;buceo;fauna;barco,4.9
+28,Galápagos,Ecuador,Las Grietas,Aire libre,Piscina natural de agua cristalina entre paredes de roca volcánica.,0,economico,tarde,2,no,si,nado;naturaleza;fotografia,4.7
+29,Galápagos,Ecuador,Calle de los Kioskos,Gastronomía,Mariscos frescos y pescado al ajillo en ambiente local.,18,economico,noche,1.5,si,no,mariscos;pescado;local;noche,4.5
+30,Galápagos,Ecuador,Rancho El Chato,Aire libre,Tortugas gigantes en estado silvestre en la parte alta de Santa Cruz.,10,economico,tarde,2.5,parcial,si,tortugas;fauna;naturaleza,4.8
+31,Galápagos,Ecuador,Cena frente al mar en Puerto Ayora,Gastronomía,Restaurante con menú de autor y opciones vegetarianas.,55,lujo,noche,2,si,si,alta cocina;mar;romantico,4.6
+32,Guayaquil,Ecuador,Malecón 2000,Aire libre,"Paseo junto al río Guayas con jardines, museos y la Perla (noria).",0,economico,tarde,2.5,si,si,paseo;rio;familia;ciudad,4.7
+33,Guayaquil,Ecuador,Barrio Las Peñas y Cerro Santa Ana,Cultura e historia,Subida de 444 escalones entre casas coloridas hasta el faro.,0,economico,tarde,2,no,si,miradores;historia;fotografia,4.7
+34,Guayaquil,Ecuador,Parque Seminario (de las Iguanas),Aire libre,Parque céntrico con iguanas terrestres frente a la Catedral.,0,economico,mañana,1,si,si,iguanas;familia;centro,4.5
+35,Guayaquil,Ecuador,Encebollado en el centro,Gastronomía,Desayuno típico costeño: encebollado con chifles y limón.,5,economico,mañana,1,si,no,comida tipica;desayuno;pescado,4.6
+36,Guayaquil,Ecuador,Museo Antropológico y de Arte Contemporáneo (MAAC),Cultura e historia,Colecciones arqueológicas y arte contemporáneo ecuatoriano.,0,economico,mañana,2,si,si,museo;arte;arqueologia,4.5
+37,Guayaquil,Ecuador,Cena en Puerto Santa Ana,Gastronomía,Restaurantes y bares junto al río con vista nocturna.,40,medio,noche,2,si,si,vida nocturna;rio;cocteles,4.5
+38,Cusco,Perú,Machu Picchu (excursión de día),Cultura e historia,Tren a Aguas Calientes y visita guiada a la ciudadela inca.,180,lujo,mañana,12,parcial,si,inca;patrimonio;tren;maravilla,5.0
+39,Cusco,Perú,Qorikancha y centro histórico,Cultura e historia,Templo inca del Sol bajo el convento de Santo Domingo.,5,economico,mañana,2,parcial,si,inca;historia;arquitectura,4.7
+40,Cusco,Perú,Mercado de San Pedro,Gastronomía,"Jugos, sopas y almuerzos típicos a bajo costo.",6,economico,tarde,1.5,parcial,si,mercado;comida tipica;local,4.5
+41,Cusco,Perú,Montaña de Siete Colores,Aventura,Caminata de altura hasta Vinicunca (5.036 m); salida de madrugada.,45,medio,mañana,10,no,si,senderismo;altura;montaña,4.6
+42,Cusco,Perú,Valle Sagrado y Pisac,Aire libre,"Terrazas incas, mercado artesanal y paisajes andinos.",35,medio,tarde,6,parcial,si,valle;artesania;paisaje,4.8
+43,Cusco,Perú,Cena show con música andina,Gastronomía,Cocina novoandina con espectáculo de danzas tradicionales.,40,medio,noche,2,si,si,musica;danza;novoandino,4.4
+44,Cartagena,Colombia,Ciudad Amurallada,Cultura e historia,"Caminata por calles coloniales, balcones y plazas.",0,economico,tarde,3,parcial,si,colonial;patrimonio;fotografia,4.8
+45,Cartagena,Colombia,Castillo San Felipe de Barajas,Cultura e historia,Fortaleza militar española con túneles y vistas a la ciudad.,10,economico,mañana,2,no,si,fortaleza;historia;miradores,4.7
+46,Cartagena,Colombia,Islas del Rosario,Relax,Día de playa y snorkel en islas de arrecife coralino.,70,medio,mañana,8,parcial,si,playa;snorkel;barco;descanso,4.5
+47,Cartagena,Colombia,Barrio Getsemaní de noche,Gastronomía,"Arte urbano, comida callejera y salsa en vivo.",20,economico,noche,3,parcial,si,vida nocturna;salsa;street art,4.7
+48,Cartagena,Colombia,Restaurante de cocina caribeña de autor,Gastronomía,Menú degustación caribeño con mariscos y opción vegetariana.,90,lujo,noche,2.5,si,si,alta cocina;caribe;mariscos,4.8
+49,Cartagena,Colombia,Volcán de lodo El Totumo,Aventura,Baño de lodo en un pequeño volcán y enjuague en la ciénaga.,30,medio,mañana,5,no,si,lodo;experiencia;excursion,4.1

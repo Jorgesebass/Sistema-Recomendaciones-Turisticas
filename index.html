@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViajeIA · Planificador de viajes con IA, RAG y prompts</title>
+<meta name="description" content="Prototipo académico: itinerarios personalizados con LLM gratuitos, RAG local, prompt engineering y filtros de coherencia.">
+<meta name="theme-color" content="#142B26">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Librerías por CDN (la app tiene respaldo si no cargan) -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+/* =====================================================================
+   SISTEMA DE DISEÑO · "Cuaderno de viaje andino"
+   Paleta: añil (tejidos), maíz (sol de altura), páramo (tinta), niebla (fondo)
+   ===================================================================== */
+:root{
+  --bg:#EDF1EC; --surface:#FFFFFF; --surface-2:#F5F7F3; --line:#D8E0DA; --line-2:#C5D0C8;
+  --ink:#142B26; --ink-2:#3C4F4A; --muted:#66776F;
+  --indigo:#2E3A8C; --indigo-600:#232D73; --indigo-50:#ECEEF8; --indigo-100:#D9DDF2;
+  --maize:#F2B33D; --maize-600:#D99A1E; --maize-50:#FDF4DF;
+  --ok:#2F7D4F; --ok-50:#E7F4EC; --warn:#9A5A06; --warn-50:#FCF0DA; --fail:#B42318; --fail-50:#FCEBE9;
+  --c-aire:#3F7D58; --c-cultura:#2E3A8C; --c-gastro:#B9472A; --c-relax:#2C7A9B; --c-aventura:#A86B12;
+  --r-lg:22px; --r:14px; --r-sm:9px;
+  --sh-1:0 1px 2px rgba(20,43,38,.06); --sh-2:0 10px 30px -12px rgba(20,43,38,.22);
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;font-family:var(--body);font-size:16px;line-height:1.55;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--display);margin:0 0 .4em;line-height:1.15;letter-spacing:-.015em;font-weight:700}
+h2{font-size:1.45rem} h3{font-size:1.12rem} h4{font-size:1rem}
+p{margin:0 0 .7em}
+a{color:var(--indigo)}
+button,input,select,textarea{font:inherit;color:inherit}
+code,pre{font-family:var(--mono);font-size:.82rem}
+.muted,small{color:var(--muted)}
+:focus-visible{outline:3px solid var(--maize);outline-offset:2px;border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- Botones ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 18px;border-radius:999px;border:1.5px solid var(--line-2);background:var(--surface);font-weight:600;cursor:pointer;text-decoration:none;color:var(--ink);transition:background .15s,border-color .15s,transform .06s}
+.btn:hover{background:var(--surface-2);border-color:var(--ink-2)}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.pri{background:var(--maize);border-color:var(--maize);color:var(--ink)}
+.btn.pri:hover{background:var(--maize-600);border-color:var(--maize-600)}
+.btn.ind{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.btn.ind:hover{background:var(--indigo-600)}
+.btn.lg{min-height:52px;padding:0 26px;font-size:1.05rem}
+.btn.sm{min-height:34px;padding:0 13px;font-size:.86rem}
+.btn.ghost-light{background:transparent;border-color:rgba(255,255,255,.5);color:#fff}
+.btn.ghost-light:hover{background:rgba(255,255,255,.12);border-color:#fff}
+.linkbtn{background:none;border:0;padding:0;color:var(--indigo);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ---------- Cabecera (Módulo 1) ---------- */
+.bar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+.bar-in{max-width:1240px;margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);flex:none}
+.brand b{font-family:var(--display);font-size:1.25rem;letter-spacing:-.03em}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin-right:auto;min-width:0}
+.tabs button{border:0;background:none;padding:9px 12px;border-radius:9px;cursor:pointer;color:var(--ink-2);font-weight:600;font-size:.93rem;white-space:nowrap;position:relative}
+.tabs button:hover{background:var(--surface-2)}
+.tabs button[aria-selected=true]{color:var(--ink)}
+.tabs button[aria-selected=true]::after{content:"";position:absolute;left:12px;right:12px;bottom:-11px;height:3px;border-radius:3px 3px 0 0;background:var(--maize)}
+.tabs .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--indigo-50);color:var(--indigo);font-size:.72rem;margin-left:4px}
+.conn{display:flex;align-items:center;gap:8px;flex:none}
+.conn select,.conn input{height:38px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface);padding:0 10px;font-size:.88rem}
+.conn select{width:150px}
+.conn input{width:170px}
+.pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:99px;font-size:.82rem;font-weight:700;white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.pill.pend{background:var(--warn-50);color:var(--warn)}
+.pill.act{background:var(--ok-50);color:var(--ok)}
+.pill.act i{box-shadow:0 0 0 3px rgba(47,125,79,.18)}
+.pill.err{background:var(--fail-50);color:var(--fail)}
+.iconbtn{width:38px;height:38px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer}
+.iconbtn:hover{border-color:var(--ink-2)}
+@media (max-width:1100px){.conn select,.conn input{display:none}}
+@media (max-width:720px){.brand{margin-right:auto}.bar-in{flex-wrap:wrap;gap:8px}.tabs{order:3;width:100%;margin:0}.tabs button[aria-selected=true]::after{bottom:-4px}}
+
+.notice{background:var(--ink);color:#E6EEEA;font-size:.9rem}
+.notice-in{max-width:1240px;margin:0 auto;padding:9px 24px;display:flex;gap:12px;align-items:center}
+.notice b{color:#fff}
+.notice .linkbtn{color:var(--maize)}
+.notice .x{margin-left:auto;background:none;border:0;color:#9FB3AB;cursor:pointer;font-size:1.2rem;line-height:1}
+
+/* ---------- Hero: la frase del viaje (Módulo 2) ---------- */
+.hero{position:relative;color:#fff;background:var(--ink);overflow:hidden;isolation:isolate}
+.hero-bg{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:center;transform:scale(1.03);opacity:0;transition:opacity .8s var(--ease)}
+.hero-bg.on{opacity:1}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(100deg,rgba(14,32,28,.92) 0%,rgba(14,32,28,.78) 45%,rgba(14,32,28,.35) 100%)}
+.hero-pattern{position:absolute;inset:0;z-index:-3;background-color:#1B3A33;background-image:repeating-linear-gradient(135deg,rgba(242,179,61,.07) 0 14px,transparent 14px 28px),repeating-linear-gradient(45deg,rgba(46,58,140,.25) 0 14px,transparent 14px 28px)}
+.hero-in{max-width:1240px;margin:0 auto;padding:64px 24px 44px;position:relative}
+.sentence{font-family:var(--display);font-size:clamp(1.65rem,3.6vw,3rem);line-height:1.3;font-weight:600;letter-spacing:-.025em;max-width:22ch;margin:0 0 6px;text-wrap:balance}
+.ib{font:inherit;color:#fff;background:transparent;border:0;border-bottom:3px solid var(--maize);border-radius:0;padding:0 2px;outline:none;transition:background .15s}
+.ib:hover,.ib:focus{background:rgba(242,179,61,.14)}
+.ib:focus-visible{outline:none;background:rgba(242,179,61,.22)}
+.ib.num{width:1.9ch;text-align:center;-moz-appearance:textfield}
+.ib.num::-webkit-outer-spin-button,.ib.num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ib.dest{min-width:3ch}
+.ib.dest::-webkit-calendar-picker-indicator{display:none!important}
+.measure{position:absolute;visibility:hidden;white-space:pre;left:-9999px;top:0}
+select.ib{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:.9em;background-image:linear-gradient(45deg,transparent 50%,var(--maize) 50%),linear-gradient(135deg,var(--maize) 50%,transparent 50%);background-position:calc(100% - .45em) 58%,calc(100% - .2em) 58%;background-size:.25em .25em;background-repeat:no-repeat}
+select.ib option{color:var(--ink);font-size:1rem}
+.budget-hint{color:#B9CCC4;font-size:.95rem;margin:0 0 26px}
+.prefrow{display:grid;grid-template-columns:150px 1fr;gap:10px 16px;align-items:start;margin-bottom:14px;max-width:880px}
+.prefrow .lab{font-weight:600;color:#CFE0D9;padding-top:8px}
+@media (max-width:640px){.prefrow{grid-template-columns:1fr}.prefrow .lab{padding:0}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 15px;border-radius:999px;border:1.5px solid rgba(255,255,255,.35);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-weight:600;font-size:.93rem;user-select:none;transition:background .15s,border-color .15s}
+.chip:hover{border-color:#fff}
+.chip[aria-pressed=true]{background:var(--maize);border-color:var(--maize);color:var(--ink)}
+.chips.sm .chip{min-height:32px;padding:0 12px;font-size:.85rem}
+.free{width:100%;max-width:520px;margin-top:10px;height:40px;border-radius:var(--r-sm);border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;padding:0 12px}
+.free::placeholder{color:#A9BDB5}
+.free:focus{outline:none;border-color:var(--maize)}
+.cta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:28px}
+.cta-note{color:#B9CCC4;font-size:.9rem}
+.credit{position:absolute;right:24px;bottom:12px;font-size:.75rem;color:#C9D8D2;text-decoration:none;opacity:.85}
+.credit:hover{text-decoration:underline}
+
+/* ---------- Destinos + base de conocimiento (Módulo 3) ---------- */
+.sec{padding:36px 0 8px}
+.sec-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.sec-h h2{margin:0}
+.sec-h .muted{font-size:.92rem}
+.dest-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(210px,1fr);gap:14px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
+.dcard{position:relative;height:150px;border-radius:var(--r);overflow:hidden;border:0;padding:0;cursor:pointer;scroll-snap-align:start;text-align:left;color:#fff;background:var(--ink)}
+.dcard .img{position:absolute;inset:0}
+.dcard::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(10,25,22,.85))}
+.dcard span{position:absolute;left:14px;bottom:12px;right:14px;z-index:1}
+.dcard b{display:block;font-family:var(--display);font-size:1.2rem}
+.dcard small{color:#D3E1DB}
+.dcard[aria-current=true]{outline:3px solid var(--maize);outline-offset:3px}
+.kb{margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:2px dashed var(--line-2);border-radius:var(--r);padding:14px 18px;background:var(--surface);transition:border-color .15s,background .15s}
+.kb.over{border-color:var(--indigo);background:var(--indigo-50)}
+.kb .ic{width:40px;height:40px;border-radius:12px;background:var(--indigo-50);display:grid;place-items:center;flex:none}
+.kb .txt{flex:1;min-width:220px}
+.kb .txt b{display:block}
+.kb-schema{margin-top:10px}
+.kb-schema summary{cursor:pointer;color:var(--indigo);font-weight:600;font-size:.9rem}
+
+/* ---------- Resultados ---------- */
+.results{padding:34px 0 60px}
+.res{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
+@media (max-width:1020px){.res{grid-template-columns:1fr}}
+.trip-h{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.trip-h h2{font-size:clamp(1.6rem,3vw,2.3rem);margin:0}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line);white-space:nowrap}
+.tag.g{background:var(--ok-50);color:var(--ok);border-color:transparent}.tag.r{background:var(--fail-50);color:var(--fail);border-color:transparent}.tag.y{background:var(--warn-50);color:var(--warn);border-color:transparent}.tag.b{background:var(--indigo-50);color:var(--indigo);border-color:transparent}.tag.v{background:var(--maize-50);color:#7A4E00;border-color:transparent}
+.summary-txt{font-size:1.08rem;color:var(--ink-2);max-width:70ch}
+.steps{list-style:none;display:flex;gap:6px;padding:0;margin:16px 0 18px;flex-wrap:wrap;counter-reset:s}
+.steps li{counter-increment:s}
+.steps a,.steps span{display:inline-flex;align-items:center;gap:7px;font-size:.84rem;font-weight:600;padding:6px 11px 6px 7px;border-radius:99px;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);text-decoration:none}
+.steps a::before,.steps span::before{content:counter(s);width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--ok);color:#fff;font-size:.72rem}
+.steps a:hover{border-color:var(--indigo);color:var(--indigo)}
+.why{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--indigo);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:20px}
+.why summary{cursor:pointer;font-weight:700}
+.why ol{margin:8px 0 0;padding-left:20px;color:var(--ink-2)}
+.daynav{display:flex;gap:6px;overflow-x:auto;position:sticky;top:var(--barh,61px);z-index:5;background:var(--bg);padding:8px 0;margin-bottom:6px}
+.daynav a{flex:none;text-decoration:none;font-weight:600;font-size:.88rem;color:var(--ink-2);padding:7px 14px;border-radius:99px;border:1.5px solid var(--line-2);background:var(--surface)}
+.daynav a:hover{border-color:var(--ink)}
+.day{background:var(--surface);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh-1),var(--sh-2);margin-bottom:22px}
+.day-cover{position:relative;height:190px;background:var(--ink)}
+.day-cover .img{position:absolute;inset:0}
+.day-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,25,22,.1) 20%,rgba(10,25,22,.86))}
+.day-cap{position:absolute;left:22px;right:22px;bottom:16px;z-index:1;color:#fff;display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.day-cap .d{font-weight:700;color:var(--maize);font-size:.95rem}
+.day-cap h3{font-size:1.45rem;margin:2px 0 0}
+.day-cap .c{font-family:var(--display);font-size:1.3rem;font-weight:700;white-space:nowrap}
+.day-cap .c small{display:block;color:#C9D8D2;font-family:var(--body);font-size:.75rem;font-weight:500;text-align:right}
+.tl{list-style:none;margin:0;padding:8px 22px 4px}
+.slot{display:grid;grid-template-columns:78px 92px 1fr;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);position:relative}
+.slot:last-child{border-bottom:0}
+.slot.bad{background:linear-gradient(90deg,var(--fail-50),transparent 70%);margin:0 -22px;padding-left:22px;padding-right:22px}
+.when{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-weight:700;font-size:.85rem;color:var(--ink-2)}
+.when svg{width:26px;height:26px}
+.thumb{width:92px;height:92px;border-radius:12px;overflow:hidden;position:relative}
+.what h4{font-family:var(--body);font-weight:700;font-size:1.04rem;margin:0 0 3px;letter-spacing:0}
+.what p{margin:0 0 8px;color:var(--ink-2);font-size:.93rem}
+@media (max-width:600px){.slot{grid-template-columns:64px 1fr}.thumb{display:none}}
+.tip{margin:0;padding:12px 22px 18px;color:var(--ink-2);font-size:.92rem;display:flex;gap:8px}
+.tip svg{flex:none;margin-top:2px}
+.wrapup{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+@media (max-width:700px){.wrapup{grid-template-columns:1fr}}
+.wrapup section{background:var(--surface);border-radius:var(--r);padding:16px 18px;border:1px solid var(--line)}
+.wrapup ul{margin:0;padding-left:18px;color:var(--ink-2)}
+
+/* Imágenes con respaldo de patrón textil por categoría */
+.img{background-color:var(--cc,#2E3A8C);background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.14) 0 7px,transparent 7px 16px),repeating-linear-gradient(45deg,rgba(0,0,0,.1) 0 7px,transparent 7px 16px)}
+.img::before{content:attr(data-icon);position:absolute;inset:0;display:grid;place-items:center;font-size:1.9rem;opacity:.9}
+.img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s var(--ease)}
+.img img.ok{opacity:1}
+.img .cr{position:absolute;right:6px;bottom:5px;z-index:2;font-size:.66rem;color:#fff;background:rgba(0,0,0,.45);padding:1px 6px;border-radius:99px;text-decoration:none}
+.day-cover .img .cr{top:10px;bottom:auto;right:10px}
+
+/* Columna lateral */
+.rail{position:sticky;top:calc(var(--barh,61px) + 14px);display:grid;gap:16px}
+@media (max-width:1020px){.rail{position:static}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.panel h3{margin-bottom:10px}
+.big{font-family:var(--display);font-size:2.4rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.meter{height:10px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;margin:12px 0 6px}
+.meter i{display:block;height:100%;border-radius:99px;background:var(--indigo);transition:width .6s var(--ease)}
+.bars{display:grid;gap:5px;margin-top:12px;font-size:.84rem}
+.bars div{display:grid;grid-template-columns:48px 1fr 52px;gap:8px;align-items:center}
+.bars span:nth-child(2){height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bars span:nth-child(2) i{display:block;height:100%;background:var(--maize)}
+.bars span:last-child{text-align:right;font-weight:600}
+.score{display:flex;gap:14px;align-items:center}
+.ring{--p:0;--c:var(--ok);width:68px;height:68px;border-radius:50%;flex:none;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--surface-2) 0);display:grid;place-items:center}
+.ring b{width:54px;height:54px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-family:var(--display);font-size:1.05rem}
+.checks{display:grid;gap:6px;margin-top:12px}
+.chk{display:grid;grid-template-columns:22px 1fr;gap:9px;font-size:.88rem;padding:8px 10px;border-radius:var(--r-sm);background:var(--surface-2)}
+.chk .ic{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:.75rem;color:#fff}
+.chk.ok .ic{background:var(--ok)} .chk.warn .ic{background:var(--maize-600)} .chk.fail .ic{background:var(--fail)}
+.chk.fail{background:var(--fail-50)} .chk.warn{background:var(--warn-50)}
+.chk p{margin:1px 0 0;color:var(--ink-2);font-size:.8rem}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.seg2 button{min-height:40px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:var(--surface);font-weight:600;cursor:pointer}
+.seg2 button[aria-pressed=true].u{background:var(--ok-50);border-color:var(--ok);color:var(--ok)}
+.seg2 button[aria-pressed=true].a{background:var(--warn-50);border-color:var(--warn);color:var(--warn)}
+textarea.ta,input.in,select.in{width:100%;border:1.5px solid var(--line-2);border-radius:var(--r-sm);padding:10px 12px;background:var(--surface);outline:none}
+textarea.ta{min-height:84px;resize:vertical}
+textarea.ta:focus,input.in:focus,select.in:focus{border-color:var(--indigo);box-shadow:0 0 0 3px var(--indigo-100)}
+.quick{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 10px}
+.quick button{border:1px dashed var(--line-2);background:var(--surface-2);border-radius:99px;font-size:.78rem;padding:3px 10px;cursor:pointer;color:var(--ink-2)}
+.quick button:hover{border-color:var(--ink-2)}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:.85rem;color:var(--ink-2);margin:4px 0 12px}
+.versions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.versions button{border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 11px;font-size:.8rem;cursor:pointer}
+.versions button[aria-current=true]{border-color:var(--indigo);background:var(--indigo-50);color:var(--indigo);font-weight:700}
+
+/* Esqueleto de carga */
+.skel{background:linear-gradient(90deg,#E3E9E4 0%,#F2F5F1 50%,#E3E9E4 100%);background-size:200% 100%;animation:sk 1.2s linear infinite;border-radius:10px}
+@keyframes sk{to{background-position:-200% 0}}
+.loading-note{display:flex;gap:12px;align-items:center;margin:4px 0 18px;font-weight:600}
+.spin{width:20px;height:20px;border:3px solid var(--indigo-100);border-top-color:var(--indigo);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.errbox{background:var(--fail-50);border:1px solid #F3C1BB;color:#7A1A12;border-radius:var(--r);padding:14px 16px;margin-bottom:12px}
+.note{background:var(--indigo-50);border-radius:var(--r-sm);padding:10px 14px;font-size:.88rem;margin:10px 0;color:#1E2766}
+.empty{padding:30px 18px;text-align:center;color:var(--muted);border:1.5px dashed var(--line-2);border-radius:var(--r);background:var(--surface)}
+.hint{font-size:.82rem;color:var(--muted)}
+
+/* ---------- Vistas RAG / Prompt / Aprende / Documentación ---------- */
+main.views{max-width:1240px;margin:0 auto;padding:30px 24px 60px}
+.view{display:none}
+.view.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;margin-bottom:18px}
+.card-h{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.card-h h2,.card-h h3{margin:0}
+.badge-m{font-size:.78rem;font-weight:700;color:var(--indigo);background:var(--indigo-50);border-radius:99px;padding:3px 10px}
+.grid{display:grid;grid-template-columns:minmax(260px,330px) 1fr;gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:1fr!important}}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--surface-2);border-radius:var(--r-sm);padding:12px 14px}
+.stat b{font-family:var(--display);font-size:1.7rem;display:block;letter-spacing:-.02em}
+.stat span{font-size:.82rem;color:var(--muted)}
+.tscroll{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:var(--r-sm)}
+table.t{width:100%;border-collapse:collapse;font-size:.86rem}
+table.t th,table.t td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{font-size:.8rem;color:var(--muted);background:var(--surface-2);font-weight:700;position:sticky;top:0}
+.bd{display:flex;flex-wrap:wrap;gap:3px}
+.chunks{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.chunk{border:1px solid var(--line);border-left:4px solid var(--indigo);border-radius:var(--r-sm);padding:10px 12px;background:var(--surface);font-size:.84rem}
+.chunk .h{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;font-weight:700}
+.chunk pre{white-space:pre-wrap;margin:6px 0 0;background:var(--surface-2);padding:8px;border-radius:8px;font-size:.75rem}
+pre.code{background:#10241F;color:#DCE7E2;border-radius:var(--r);padding:16px 18px;overflow:auto;white-space:pre-wrap;word-break:break-word;max-height:560px;line-height:1.55;margin:0}
+pre.code .s-sys{color:#7EE0C8} pre.code .s-ctx{color:#9ECBFF} pre.code .s-pref{color:#F2C46A} pre.code .s-fb{color:#FFA7A0} pre.code .s-cot{color:#C9B8FF} pre.code .s-fmt{color:#B5EBC4} pre.code .s-shot{color:#F7B2D9}
+pre.code .var{background:#21403A;color:#FFE08A;border-radius:4px;padding:0 3px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem;margin:8px 0 14px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px}
+.edu{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media (max-width:860px){.edu{grid-template-columns:1fr!important}}
+.edu .card{margin:0}
+.edu ul,.edu ol{padding-left:18px;margin:6px 0}
+.ico{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;font-size:1.1rem}
+details.ph{border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:10px;background:var(--surface);overflow:hidden}
+details.ph summary{cursor:pointer;padding:13px 16px;font-weight:700;display:flex;align-items:center;gap:12px;list-style:none}
+details.ph summary::-webkit-details-marker{display:none}
+details.ph summary .num{width:30px;height:30px;border-radius:10px;background:var(--indigo);color:#fff;display:grid;place-items:center;font-size:.85rem;flex:none}
+details.ph summary .wk{margin-left:auto;font-weight:500;font-size:.84rem;color:var(--muted)}
+details.ph[open] summary{border-bottom:1px solid var(--line);background:var(--surface-2)}
+.ph-body{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 24px;padding:14px 16px;font-size:.92rem}
+@media (max-width:760px){.ph-body{grid-template-columns:1fr}}
+.ph-body h4{font-family:var(--body);font-size:.88rem;color:var(--muted);margin:0 0 4px}
+.ph-body ul{margin:0 0 6px;padding-left:18px}
+.arch{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0}
+@media (max-width:860px){.arch{grid-template-columns:repeat(2,1fr)}}
+.comp{border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;background:var(--surface-2);font-size:.86rem;position:relative}
+.comp b{display:block;margin-bottom:3px;padding-right:28px}
+.comp .k{position:absolute;top:10px;right:10px;font-size:.72rem;font-weight:800;color:var(--indigo)}
+.layer{font-weight:700;color:var(--muted);margin:16px 0 4px;font-size:.92rem}
+.flow{counter-reset:f;list-style:none;padding:0;margin:8px 0}
+.flow li{counter-increment:f;position:relative;padding:8px 10px 10px 44px;border-left:2px solid var(--indigo-100);margin-left:14px;font-size:.93rem}
+.flow li::before{content:counter(f);position:absolute;left:-15px;top:6px;width:28px;height:28px;border-radius:50%;background:var(--indigo);color:#fff;display:grid;place-items:center;font-weight:700;font-size:.8rem}
+pre.tree{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px;font-size:.84rem;line-height:1.5;overflow:auto}
+.svgwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);padding:10px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.88rem}
+.kv span:nth-child(odd){color:var(--muted)}
+
+/* ---------- Panel lateral de conexión ---------- */
+.scrim{position:fixed;inset:0;background:rgba(14,32,28,.45);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--surface);z-index:61;transform:translateX(102%);transition:transform .28s var(--ease);display:flex;flex-direction:column;box-shadow:-20px 0 50px -20px rgba(0,0,0,.35)}
+.drawer.on{transform:none}
+.drawer header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
+.drawer header h2{margin:0;font-size:1.3rem}
+.drawer .body{overflow:auto;padding:18px 22px 26px}
+.drawer .fld{margin-bottom:16px}
+.drawer label.l{display:block;font-weight:700;font-size:.92rem;margin-bottom:6px}
+.provs{display:grid;gap:8px}
+.prov{display:grid;grid-template-columns:20px 1fr;gap:10px;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:12px;cursor:pointer}
+.prov:has(input:checked){border-color:var(--indigo);background:var(--indigo-50)}
+.prov input{margin-top:3px;accent-color:var(--indigo)}
+.prov b{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prov p{margin:3px 0 0;font-size:.83rem;color:var(--ink-2)}
+.range{display:flex;gap:10px;align-items:center}
+.range input{flex:1;accent-color:var(--indigo)}
+.radios{display:grid;gap:6px}
+.radios label{display:flex;gap:8px;align-items:flex-start;font-size:.9rem}
+.radios input{accent-color:var(--indigo);margin-top:4px}
+
+#toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,16px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:.92rem;opacity:0;transition:all .25s;z-index:99;max-width:92vw;pointer-events:none;box-shadow:var(--sh-2)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+footer{text-align:center;font-size:.82rem;color:var(--muted);padding:26px 24px 34px}
+
+/* ---------- Impresión ---------- */
+@media print{
+  .bar,.notice,.hero,.sec,.rail .fbp,.daynav,.steps,#toast,footer,.drawer,.scrim,.no-print{display:none!important}
+  body{background:#fff;font-size:12px}
+  .res{grid-template-columns:1fr}
+  .rail{position:static}
+  .day{box-shadow:none;border:1px solid var(--line);break-inside:avoid}
+  details.ph{break-inside:avoid}
+  pre.code{max-height:none}
+}
+body.print-mode .bar,body.print-mode .notice,body.print-mode footer,body.print-mode .no-print,body.print-mode #planView{display:none!important}
+body.print-mode{background:#fff}
+body.print-mode #toast{display:none!important}
+body.print-mode .doc-part{display:none}
+body.print-mode .doc-part.pshow{display:block}
+.print-title{display:none}
+body.print-mode .print-title{display:block;margin-bottom:18px;border-bottom:4px solid var(--maize);padding-bottom:12px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="#F2B33D" stroke="#D99A1E"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="#D99A1E"/></symbol>
+  <symbol id="i-dusk" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-width="1.8"><path d="M6.5 16a5.5 5.5 0 0 1 11 0" fill="#F2B33D" stroke="#B9472A"/><path d="M3 16h18M7 20h10M12 5v3M4.6 9.6l2 1.6M19.4 9.6l-2 1.6" stroke="#B9472A"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none"><path d="M19.5 14.6A8 8 0 1 1 9.4 4.5a6.4 6.4 0 0 0 10.1 10.1z" fill="#2E3A8C"/><circle cx="17" cy="5" r="1" fill="#F2B33D"/><circle cx="20.5" cy="9" r=".7" fill="#F2B33D"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="#2E3A8C" stroke-width="1.8" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+</svg>
+
+<!-- ===================== MÓDULO 1 · CABECERA Y CONEXIÓN ===================== -->
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#" id="home" aria-label="ViajeIA, inicio">
+      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#142B26"/><path d="M8 46l14-18 9 11 8-9 17 16z" fill="#2E3A8C"/><path d="M22 28l5 6-5-1-4 4z" fill="#fff" opacity=".9"/><circle cx="46" cy="18" r="7" fill="#F2B33D"/></svg>
+      <b>ViajeIA</b>
+    </a>
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button role="tab" aria-selected="true" data-view="plan">Planificar</button>
+      <button role="tab" aria-selected="false" data-view="rag">RAG <span class="n" id="nRag">0</span></button>
+      <button role="tab" aria-selected="false" data-view="prompt">Prompt</button>
+      <button role="tab" aria-selected="false" data-view="edu">Aprende</button>
+      <button role="tab" aria-selected="false" data-view="doc">Documentación</button>
+    </nav>
+    <div class="conn">
+      <label class="sr" for="provider">Proveedor de IA</label>
+      <select id="provider"></select>
+      <label class="sr" for="apiKey">API Key</label>
+      <input id="apiKey" type="password" placeholder="Pega tu API Key" autocomplete="off" spellcheck="false">
+      <span id="status" class="pill pend" role="status"><i></i>Pendiente</span>
+      <button class="iconbtn" id="btnConn" aria-label="Ajustes de conexión con la IA" title="Ajustes de conexión con la IA"><svg width="20" height="20"><use href="#i-gear"/></svg></button>
+    </div>
+  </div>
+</header>
+<div class="notice" id="notice"></div>
+
+<!-- ===================== VISTA PLANIFICAR ===================== -->
+<div id="planView">
+  <section class="hero" id="hero">
+    <div class="hero-pattern"></div>
+    <div class="hero-bg" id="heroBg"></div>
+    <div class="hero-in">
+      <form id="tripForm" onsubmit="return false" aria-label="Preferencias del viajero">
+        <p class="sentence">
+          Somos <input id="travelers" class="ib num" type="number" min="1" max="12" value="2" aria-label="Número de viajeros" inputmode="numeric">
+          y queremos pasar <input id="days" class="ib num" type="number" min="1" max="14" value="3" aria-label="Duración del viaje en días" inputmode="numeric">
+          días en <input id="dest" class="ib dest" list="destList" value="Quito" aria-label="Destino deseado" autocomplete="off">
+          con un presupuesto <select id="budget" class="ib" aria-label="Nivel de presupuesto"><option value="economico">económico</option><option value="medio" selected>medio</option><option value="lujo">de lujo</option></select>.
+        </p>
+        <datalist id="destList"></datalist>
+        <p class="budget-hint" id="budgetHint"></p>
+        <div class="prefrow"><span class="lab" id="lInt">Nos interesa</span><div class="chips" id="interests" role="group" aria-labelledby="lInt"></div></div>
+        <div class="prefrow"><span class="lab" id="lRes">Ten en cuenta</span>
+          <div><div class="chips sm" id="restrChips" role="group" aria-labelledby="lRes"></div>
+          <input id="restrFree" class="free" type="text" placeholder="Otra necesidad: dieta, horarios, accesibilidad…" aria-label="Otras restricciones o necesidades especiales"></div>
+        </div>
+        <div class="cta">
+          <button class="btn pri lg" id="btnPrimary" type="button"></button>
+          <button class="btn ghost-light" id="btnSecondary" type="button"></button>
+          <span class="cta-note" id="ctaNote"></span>
+        </div>
+      </form>
+      <a class="credit" id="heroCredit" target="_blank" rel="noopener" hidden></a>
+    </div>
+  </section>
+
+  <section class="sec wrap" aria-labelledby="hDest">
+    <div class="sec-h"><h2 id="hDest">Destinos de tu base de conocimiento</h2><span class="muted" id="dsMeta"></span></div>
+    <div class="dest-row" id="destRow"></div>
+    <!-- MÓDULO 3 · CARGA DE ARCHIVOS -->
+    <div class="kb" id="kb">
+      <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2E3A8C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M20 16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3"/></svg></div>
+      <div class="txt"><b>Arrastra aquí tu destinos_turisticos.csv o un archivo XLSX</b><span class="muted" id="kbSrc">El sistema lo lee en memoria y lo usa como fuente del RAG.</span></div>
+      <div class="btns">
+        <button class="btn sm ind" id="btnFile">Elegir archivo</button>
+        <button class="btn sm" id="btnSample">Usar datos de ejemplo</button>
+        <button class="btn sm" id="btnDlCsv">Descargar CSV de ejemplo</button>
+      </div>
+      <input type="file" id="file" accept=".csv,.xlsx,.xls" hidden>
+    </div>
+    <details class="kb-schema" id="kbSchema"><summary>Ver cómo se interpretó el archivo</summary><div id="dsInfo" style="margin-top:10px"></div></details>
+  </section>
+
+  <section class="results wrap" id="results" hidden aria-live="polite"></section>
+</div>
+
+<!-- ===================== VISTAS SECUNDARIAS ===================== -->
+<main class="views" id="views" hidden>
+<section class="view" id="v-rag">
+  <div class="card">
+    <div class="card-h"><span class="badge-m">Módulo 3</span><h2>Qué se recupera y por qué</h2></div>
+    <p class="muted">El sistema no envía todo el archivo al modelo: filtra por destino, puntúa cada registro según tus preferencias y conserva solo los <b>top-k</b> más cercanos. Esos registros se convierten en fragmentos de texto (chunks) que forman el contexto del LLM.</p>
+    <div id="ragOut"><div class="empty">Crea un itinerario o pulsa “Ejecutar solo la recuperación” para ver esta etapa.</div></div>
+    <div class="btns" style="margin-top:14px"><button class="btn sm" id="btnOnlyRag">Ejecutar solo la recuperación</button></div>
+  </div>
+</section>
+<section class="view" id="v-prompt">
+  <div class="card">
+    <div class="card-h" style="justify-content:space-between">
+      <div class="card-h" style="margin:0"><span class="badge-m">Módulo 4</span><h2>Construcción dinámica del prompt</h2></div>
+      <div class="btns"><button class="btn sm" id="btnBuildPrompt">Construir prompt</button><button class="btn sm" id="btnCopy">Copiar prompt</button></div>
+    </div>
+    <div id="promptOut"><div class="empty">Aún no se ha construido ningún prompt.</div></div>
+  </div>
+</section>
+<section class="view" id="v-edu">
+  <div class="card-h"><span class="badge-m">Módulo 7</span><h2>Sección educativa: cómo funciona por dentro</h2></div>
+  <div class="edu">
+    <div class="card">
+      <div class="card-h"><div class="ico" style="background:var(--violet-50)">🧩</div><h3>Prompt Engineering</h3></div>
+      <p>Un prompt eficaz es una <b>especificación</b>, no una pregunta suelta. En esta app se construye con bloques:</p>
+      <ul>
+        <li><b>Rol (system):</b> “Eres un experto en planificación turística…” fija tono y criterio.</li>
+        <li><b>Reglas explícitas:</b> respetar presupuesto, restricciones y citar la fuente (<code>ref</code>).</li>
+        <li><b>Few-shot:</b> un ejemplo de entrada → salida enseña el formato exacto sin entrenar.</li>
+        <li><b>Chain-of-Thought guiado:</b> se pide razonar por pasos (filtrar → asignar → sumar → verificar) y resumir ese razonamiento en el campo <code>razonamiento</code>.</li>
+        <li><b>Salida estructurada (JSON):</b> permite validar automáticamente el resultado.</li>
+      </ul>
+      <p class="hint">Prueba: cambia una restricción y mira en “Prompt generado” qué variable cambió.</p>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="ico" style="background:var(--acc-50)">🔎</div><h3>RAG (Retrieval-Augmented Generation)</h3></div>
+      <p>El LLM no conoce tu archivo. RAG le <b>inyecta información recuperada</b> justo antes de generar:</p>
+      <ol style="padding-left:18px;margin:6px 0">
+        <li><b>Carga:</b> el CSV/XLSX se lee en memoria y se normalizan las columnas.</li>
+        <li><b>Recuperación:</b> cada registro recibe un puntaje (destino +5, interés +3, presupuesto, rating, palabras clave, penalización por restricciones).</li>
+        <li><b>Chunking:</b> los top-k se convierten en fragmentos de texto con metadatos.</li>
+        <li><b>Aumento:</b> los fragmentos van al prompt como “CONTEXTO RECUPERADO”.</li>
+        <li><b>Generación con grounding:</b> el modelo debe citar <code>#id</code> de cada actividad.</li>
+      </ol>
+      <p class="hint">Aquí la recuperación es heurística (léxica). En producción se usan <i>embeddings</i> y una base vectorial (FAISS, Chroma, pgvector) para buscar por significado.</p>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="ico" style="background:var(--warn-50)">🧠</div><h3>Fine-Tuning (conceptual)</h3></div>
+      <div class="tscroll" style="max-height:none">
+      <table class="t">
+        <tr><th></th><th>Entrenar / Fine-tuning</th><th>Personalizar prompts</th><th>RAG</th></tr>
+        <tr><td><b>Qué cambia</b></td><td>Los pesos del modelo</td><td>Solo la instrucción</td><td>El contexto que recibe</td></tr>
+        <tr><td><b>Datos</b></td><td>Cientos/miles de ejemplos de calidad</td><td>Ninguno o pocos ejemplos</td><td>Documentos o tablas consultables</td></tr>
+        <tr><td><b>Costo</b></td><td>Alto (GPU, tiempo, evaluación)</td><td>Muy bajo</td><td>Bajo–medio</td></tr>
+        <tr><td><b>Actualizar info</b></td><td>Reentrenar</td><td>Editar texto</td><td>Reemplazar el archivo</td></tr>
+        <tr><td><b>Ideal para</b></td><td>Estilo, formato y tono consistentes</td><td>Prototipos e iteración rápida</td><td>Datos cambiantes y citables</td></tr>
+      </table>
+      </div>
+      <p class="hint" style="margin-top:8px">Este prototipo usa <b>prompts + RAG</b>. El fine-tuning (p. ej. LoRA/QLoRA sobre itinerarios curados) sería la fase siguiente, y la retroalimentación del Módulo 6 puede convertirse en datos de entrenamiento o de preferencias (DPO/RLHF).</p>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="ico" style="background:var(--ok-50)">✅</div><h3>Filtros de coherencia</h3></div>
+      <p>Tras generar, el sistema <b>no confía ciegamente</b> en el LLM. Verifica:</p>
+      <ul>
+        <li><b>Restricciones:</b> cruza cada actividad con su registro (<code>accesible</code>, <code>apto_vegetariano</code>, etiquetas de altura) y busca palabras prohibidas.</li>
+        <li><b>Presupuesto:</b> recalcula la suma de costos por día y la compara con el tope del nivel elegido; detecta si el modelo “sumó mal”.</li>
+        <li><b>Intereses:</b> mide el % de actividades cuya categoría coincide con lo seleccionado.</li>
+        <li><b>Estructura y grounding:</b> número de días, franjas completas, duplicados y actividades sin fuente (posibles alucinaciones).</li>
+        <li><b>Lenguaje:</b> revisión léxica básica de estereotipos.</li>
+      </ul>
+      <p class="hint">Los fallos pueden reenviarse al modelo con “Regenerar con Ajustes” (bucle de autocorrección).</p>
+    </div>
+  </div>
+</section>
+<section class="view doc" id="v-doc">
+  <div class="print-title" id="printTitle"></div>
+  <div class="card no-print">
+    <div class="card-h"><h2 style="margin:0">Documentación técnica del proyecto</h2></div>
+    <div class="btns">
+      <a class="btn sm" href="#d-plan">1 · Plan metodológico</a>
+      <a class="btn sm" href="#d-arq">2 · Arquitectura</a>
+      <a class="btn sm" href="#d-est">3 · Estructura</a>
+      <a class="btn sm" href="#d-tec">4 · Tecnologías</a>
+      <a class="btn sm" href="#d-mej">5 · Mejoras y seguridad</a>
+      <button class="btn sm" id="btnPrintDoc">🖨️ Imprimir documentación</button>
+    </div>
+  </div>
+
+  <div class="card doc-part" id="d-plan" data-part="memoria">
+    <h2>1. Plan de trabajo metodológico</h2>
+    <p class="muted">Metodología iterativa e incremental (6 semanas). Cada fase produce un entregable verificable que alimenta la siguiente.</p>
+    <div id="phases"></div>
+  </div>
+
+  <div class="card doc-part" id="d-arq" data-part="memoria arquitectura">
+    <h2>2. Arquitectura de la solución</h2>
+    <p>Arquitectura <b>cliente puro (client-side)</b> en un único <code>index.html</code>, organizada en capas: presentación, datos, inteligencia y calidad. No hay backend: el navegador lee el archivo, recupera la información, construye el prompt y llama directamente a la API del proveedor (o al simulador local).</p>
+    <div class="svgwrap" id="archSvg"></div>
+    <div id="archComps"></div>
+    <h3>Flujo de información (de la entrada al itinerario final)</h3>
+    <ol class="flow">
+      <li><b>Entrada:</b> el usuario completa destino, días, presupuesto, intereses y restricciones (Módulo 2).</li>
+      <li><b>Validación de entrada:</b> se comprueban campos obligatorios y rangos (1–14 días); las restricciones en texto libre se convierten en banderas (vegetariano, movilidad, sin noche, sin altura).</li>
+      <li><b>Carga de datos:</b> PapaParse/SheetJS leen el CSV/XLSX; se detecta el esquema por sinónimos de columnas y se normalizan los registros en memoria.</li>
+      <li><b>Recuperación (RAG):</b> se filtra por destino y se puntúa cada registro; se seleccionan los top-k (≈ 4 por día).</li>
+      <li><b>Chunking:</b> cada registro se transforma en un fragmento de texto con metadatos (id, costo, franja, accesibilidad).</li>
+      <li><b>Construcción del prompt:</b> rol de sistema + reglas + ejemplo few-shot + contexto recuperado + preferencias + retroalimentación previa + instrucciones de razonamiento + esquema JSON.</li>
+      <li><b>Integración con IA:</b> con API Key se llama al proveedor elegido (Gemini, Groq, OpenRouter o GPT-4o-mini) en modo JSON; sin clave, el simulador produce una respuesta equivalente a partir del mismo contexto.</li>
+      <li><b>Generación y normalización:</b> se extrae y repara el JSON, se recalculan costos y se dibujan las tarjetas por día.</li>
+      <li><b>Validación:</b> los filtros de coherencia evalúan estructura, presupuesto, restricciones, intereses, grounding, duplicados y lenguaje, y producen un puntaje de calidad.</li>
+      <li><b>Retroalimentación:</b> la valoración y los comentarios (más los fallos detectados) se inyectan en el siguiente prompt y en la puntuación RAG; cada regeneración crea una nueva versión comparable.</li>
+    </ol>
+  </div>
+
+  <div class="card doc-part" id="d-est" data-part="memoria">
+    <h2>3. Estructura del proyecto</h2>
+<pre class="tree">Proyecto/
+│
+├── index.html                  ← aplicación completa (HTML + CSS + JS)
+│
+├── datos/
+│   └── destinos_turisticos.csv ← base de conocimiento para el RAG
+│
+├── recursos/
+│   ├── mock-data.json          ← datos simulados (copia editable)
+│   └── logo.png                ← identidad visual
+│
+└── documentacion/
+    ├── arquitectura.pdf        ← diagrama y descripción de componentes
+    └── memoria_tecnica.pdf     ← plan, decisiones, pruebas y resultados</pre>
+    <div class="tscroll" style="max-height:none">
+    <table class="t">
+      <tr><th>Elemento</th><th>Función</th><th>Notas técnicas</th></tr>
+      <tr><td><code>index.html</code></td><td>Único punto de ejecución. Contiene interfaz, lógica RAG, constructor de prompts, integración con APIs, simulador, filtros y sección educativa.</td><td>Se abre con doble clic (<code>file://</code>). Sin instalación ni servidor.</td></tr>
+      <tr><td><code>datos/</code></td><td>Fuentes de conocimiento que el usuario carga en el Módulo 3.</td><td>Columnas: <code>id, destino, pais, nombre, categoria, descripcion, costo_usd, nivel_presupuesto, franja_recomendada, duracion_horas, accesible, apto_vegetariano, etiquetas, rating</code> y, opcionalmente, <code>imagen_url</code>. Se aceptan sinónimos (ciudad, precio, tipo…).</td></tr>
+      <tr><td><code>recursos/mock-data.json</code></td><td>Dataset de ejemplo y actividades genéricas del modo simulado.</td><td>Los navegadores bloquean <code>fetch()</code> de archivos locales bajo <code>file://</code>, por eso <code>index.html</code> lleva una <b>copia embebida</b>; el JSON es la versión de referencia para editar.</td></tr>
+      <tr><td><code>recursos/logo.png</code></td><td>Logotipo para documentación y presentaciones.</td><td>En la app el logo va como SVG en línea (no depende de rutas).</td></tr>
+      <tr><td><code>documentacion/</code></td><td>Entregables académicos.</td><td>Generados desde esta misma pestaña (botón Imprimir → Guardar como PDF).</td></tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="card doc-part" id="d-tec" data-part="memoria">
+    <h2>4. Justificación de tecnologías y lenguajes</h2>
+    <div id="techTable"></div>
+  </div>
+
+  <div class="card doc-part" id="d-mej" data-part="memoria">
+    <h2>5. Mejoras sobre el enunciado y consideraciones de seguridad</h2>
+    <div class="edu" style="grid-template-columns:1fr 1fr">
+      <div>
+        <h3>Mejoras incorporadas</h3>
+        <ul>
+          <li><b>Proveedores gratuitos:</b> Gemini, Groq y OpenRouter además de GPT-4o-mini, con consulta en vivo de los modelos disponibles y control de temperatura.</li>
+          <li><b>Imágenes reales:</b> fotos de Wikipedia para el destino, cada día y cada actividad, con atribución; portadas opcionales generadas con IA y patrones de respaldo sin conexión.</li>
+          <li><b>Rediseño UX/UI:</b> preferencias escritas como una frase, conexión en un panel lateral, itinerario en línea de tiempo y columna fija con presupuesto, calidad y retroalimentación.</li>
+          <li><b>Puntuación RAG explicable:</b> cada registro muestra el desglose de su puntaje (destino, interés, presupuesto, rating, restricciones, retroalimentación).</li>
+          <li><b>Detección automática de esquema</b> por sinónimos de columnas: funciona con CSV/XLSX de estructura distinta.</li>
+          <li><b>Grounding verificable:</b> cada actividad cita su <code>#id</code> de origen; las que no lo tienen se marcan como posible alucinación.</li>
+          <li><b>9 filtros de coherencia</b> con puntaje global y bucle de autocorrección (los fallos se reenvían al modelo).</li>
+          <li><b>Historial de versiones</b> para comparar itinerarios antes y después de la retroalimentación.</li>
+          <li><b>Recorrido del pipeline</b> en 7 etapas enlazadas a las vistas de recuperación y prompt.</li>
+          <li><b>Funcionamiento sin conexión:</b> dataset embebido y lector CSV de respaldo si el CDN no carga.</li>
+          <li><b>Modelo configurable:</b> el identificador del modelo es editable por si el proveedor publica nuevas versiones.</li>
+          <li><b>Exportación</b> a JSON e impresión/PDF del itinerario y de la documentación.</li>
+          <li><b>Diseño responsive y accesible</b> (contraste, etiquetas, navegación con teclado).</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Seguridad y limitaciones</h3>
+        <ul>
+          <li>La API Key <b>vive solo en memoria</b> y se envía únicamente al proveedor elegido; solo se guarda en localStorage si el usuario activa “Recordar”.</li>
+          <li>Llamar a una API desde el navegador <b>expone la clave</b> a quien use el equipo: válido para un prototipo académico; en producción se usaría un backend o proxy.</li>
+          <li>Todo texto devuelto por el LLM se <b>escapa antes de mostrarse</b> (prevención de XSS).</li>
+          <li>Los datos del CSV de ejemplo son <b>ilustrativos</b>; precios y horarios reales deben verificarse.</li>
+          <li>La recuperación es léxica: no entiende sinónimos complejos como lo haría una búsqueda semántica con embeddings.</li>
+          <li>Las fotos se buscan por nombre en Wikipedia: pueden ser aproximadas y requieren conexión.</li>
+          <li>Los filtros son heurísticos: reducen errores, pero no sustituyen la revisión humana.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer>ViajeIA, prototipo académico de planificación de viajes con LLM, RAG y prompt engineering. Se ejecuta por completo en el navegador. Fotos de Wikipedia/Wikimedia Commons bajo sus licencias.</footer>
+
+<!-- ===================== PANEL DE CONEXIÓN ===================== -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" aria-hidden="true">
+  <header><h2 id="dTitle">Conexión con la IA</h2><button class="iconbtn" id="dClose" aria-label="Cerrar">✕</button></header>
+  <div class="body">
+    <p class="muted" style="font-size:.92rem">Elige un proveedor, pega tu clave y listo. Tres opciones tienen nivel gratuito sin tarjeta. La clave queda solo en esta pestaña, salvo que actives “Recordar”.</p>
+    <div class="fld"><span class="l" style="font-weight:700;display:block;margin-bottom:6px">Proveedor</span><div class="provs" id="provs"></div></div>
+    <div class="fld"><label class="l" for="dKey">API Key</label><input class="in" id="dKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega tu clave aquí"><div class="hint" id="dKeyHint" style="margin-top:6px"></div></div>
+    <div class="fld"><label class="l" for="dModel">Modelo</label><input class="in" id="dModel" list="modelList" spellcheck="false"><datalist id="modelList"></datalist>
+      <div class="btns" style="margin-top:8px"><button class="btn sm" id="btnModels">Ver modelos disponibles</button><span class="hint" id="modelsHint"></span></div></div>
+    <div class="fld"><label class="l" for="dTemp">Creatividad (temperatura)</label><div class="range"><input type="range" id="dTemp" min="0" max="1.2" step="0.1" value="0.7"><b id="dTempV">0.7</b></div><div class="hint">Valores bajos dan planes más predecibles; altos, más variados.</div></div>
+    <div class="fld"><span class="l" style="font-weight:700;display:block;margin-bottom:6px">Imágenes</span>
+      <div class="radios" id="imgModes">
+        <label><input type="radio" name="img" value="wiki" checked> <span><b>Fotos reales de Wikipedia</b><br><small>Gratis, sin clave; se busca cada lugar por su nombre.</small></span></label>
+        <label><input type="radio" name="img" value="ia"> <span><b>Portadas generadas con IA (Pollinations)</b><br><small>Gratis, sin clave, pero lento: solo para la portada del destino.</small></span></label>
+        <label><input type="radio" name="img" value="off"> <span><b>Sin imágenes</b><br><small>Útil sin conexión o con internet lento.</small></span></label>
+      </div></div>
+    <label class="check"><input type="checkbox" id="dRemember"> <span>Recordar las claves en este navegador (localStorage). Desactívalo en equipos compartidos.</span></label>
+    <div class="btns"><button class="btn ind" id="btnTest">Probar conexión</button><button class="btn" id="dDone">Listo</button></div>
+    <p class="hint" id="testOut" style="margin-top:10px"></p>
+  </div>
+</aside>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+/* ======================================================================
+   DATOS SIMULADOS EMBEBIDOS (copia de recursos/mock-data.json)
+   ====================================================================== */
+const MOCK_DATA = {"descripcion": "Datos simulados usados cuando no hay API Key o no se ha cargado un archivo. Copia embebida en index.html.", "dataset_ejemplo": [{"id": 1, "destino": "Quito", "pais": "Ecuador", "nombre": "Centro Histórico de Quito", "categoria": "Cultura e historia", "descripcion": "Recorrido a pie por plazas, iglesias coloniales y la Plaza Grande, Patrimonio de la Humanidad.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 3, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "patrimonio;caminata;colonial;fotografia", "rating": 4.8}, {"id": 2, "destino": "Quito", "pais": "Ecuador", "nombre": "Iglesia de la Compañía de Jesús", "categoria": "Cultura e historia", "descripcion": "Templo barroco con interiores cubiertos de pan de oro; visita guiada.", "costo_usd": 5, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 1, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "arte;barroco;iglesia", "rating": 4.9}, {"id": 3, "destino": "Quito", "pais": "Ecuador", "nombre": "TelefériQo y Volcán Pichincha", "categoria": "Aventura", "descripcion": "Teleférico hasta 3.945 m y caminata opcional hacia el Rucu Pichincha.", "costo_usd": 9, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 4, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "montaña;senderismo;miradores;altura", "rating": 4.6}, {"id": 4, "destino": "Quito", "pais": "Ecuador", "nombre": "Mitad del Mundo y Museo Intiñán", "categoria": "Cultura e historia", "descripcion": "Monumento ecuatorial y museo interactivo sobre la línea equinoccial.", "costo_usd": 12, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 3, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "ciencia;museo;ecuador;familia", "rating": 4.4}, {"id": 5, "destino": "Quito", "pais": "Ecuador", "nombre": "Mercado Central de Quito", "categoria": "Gastronomía", "descripcion": "Almuerzo típico: locro de papa, encebollado y jugos de frutas andinas.", "costo_usd": 8, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 1.5, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "comida tipica;mercado;locro;local", "rating": 4.5}, {"id": 6, "destino": "Quito", "pais": "Ecuador", "nombre": "Calle La Ronda de noche", "categoria": "Gastronomía", "descripcion": "Calle bohemia con canelazo, empanadas de viento y música en vivo.", "costo_usd": 15, "nivel_presupuesto": "economico", "franja_recomendada": "noche", "duracion_horas": 2.5, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "vida nocturna;musica;bohemio;canelazo", "rating": 4.6}, {"id": 7, "destino": "Quito", "pais": "Ecuador", "nombre": "Restaurante de autor en La Floresta", "categoria": "Gastronomía", "descripcion": "Menú degustación con ingredientes andinos contemporáneos; opción vegetariana.", "costo_usd": 75, "nivel_presupuesto": "lujo", "franja_recomendada": "noche", "duracion_horas": 2.5, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "alta cocina;degustacion;andino;vino", "rating": 4.8}, {"id": 8, "destino": "Quito", "pais": "Ecuador", "nombre": "Parque Metropolitano Guangüiltagua", "categoria": "Aire libre", "descripcion": "Bosque urbano con senderos, miradores al volcán Cotopaxi y ciclismo.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 3, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "naturaleza;senderos;bicicleta;picnic", "rating": 4.7}, {"id": 9, "destino": "Quito", "pais": "Ecuador", "nombre": "Spa termal en Papallacta (excursión)", "categoria": "Relax", "descripcion": "Excursión de día a piscinas termales de origen volcánico a 1,5 h de Quito.", "costo_usd": 45, "nivel_presupuesto": "medio", "franja_recomendada": "tarde", "duracion_horas": 5, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "termas;spa;descanso;volcan", "rating": 4.7}, {"id": 10, "destino": "Quito", "pais": "Ecuador", "nombre": "Museo Casa del Alabado", "categoria": "Cultura e historia", "descripcion": "Arte precolombino ecuatoriano en una casona colonial restaurada.", "costo_usd": 6, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 1.5, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "museo;precolombino;arqueologia", "rating": 4.8}, {"id": 11, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Catedral de la Inmaculada Concepción", "categoria": "Cultura e historia", "descripcion": "Catedral nueva de cúpulas azules; subida a la terraza con vista panorámica.", "costo_usd": 3, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 1.5, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "patrimonio;arquitectura;miradores", "rating": 4.8}, {"id": 12, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Parque Nacional Cajas", "categoria": "Aire libre", "descripcion": "Páramo con más de 200 lagunas; rutas de senderismo de dificultad variable.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 5, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "naturaleza;lagunas;senderismo;paramo", "rating": 4.9}, {"id": 13, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Museo Pumapungo", "categoria": "Cultura e historia", "descripcion": "Ruinas incas, jardín etnobotánico y sala etnográfica del Ecuador.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 2, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "inca;museo;arqueologia;jardin", "rating": 4.7}, {"id": 14, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Mercado 10 de Agosto", "categoria": "Gastronomía", "descripcion": "Hornado, mote pillo y jugos; experiencia local y económica.", "costo_usd": 6, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 1.5, "accesible": "parcial", "apto_vegetariano": "no", "etiquetas": "comida tipica;mercado;hornado", "rating": 4.4}, {"id": 15, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Baños termales de Cuenca", "categoria": "Relax", "descripcion": "Piscinas termales, baños de cajón y masajes en la parroquia Baños.", "costo_usd": 30, "nivel_presupuesto": "medio", "franja_recomendada": "tarde", "duracion_horas": 3, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "termas;spa;masaje;descanso", "rating": 4.6}, {"id": 16, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Cena en el Barranco del Tomebamba", "categoria": "Gastronomía", "descripcion": "Restaurante con vista al río; cocina ecuatoriana fusión.", "costo_usd": 35, "nivel_presupuesto": "medio", "franja_recomendada": "noche", "duracion_horas": 2, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "romantico;rio;fusion;vista", "rating": 4.6}, {"id": 17, "destino": "Cuenca", "pais": "Ecuador", "nombre": "Taller de sombrero de paja toquilla", "categoria": "Cultura e historia", "descripcion": "Visita a fábrica artesanal del sombrero declarado Patrimonio Inmaterial.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 1.5, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "artesania;compras;tradicion", "rating": 4.5}, {"id": 18, "destino": "Baños", "pais": "Ecuador", "nombre": "Ruta de las Cascadas en bicicleta", "categoria": "Aventura", "descripcion": "Descenso en bicicleta hasta el Pailón del Diablo por la vía a Puyo.", "costo_usd": 15, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 4, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "bicicleta;cascadas;adrenalina", "rating": 4.8}, {"id": 19, "destino": "Baños", "pais": "Ecuador", "nombre": "Casa del Árbol y columpio", "categoria": "Aire libre", "descripcion": "Columpio sobre el vacío con vista al volcán Tungurahua.", "costo_usd": 3, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 2, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "miradores;fotografia;volcan", "rating": 4.3}, {"id": 20, "destino": "Baños", "pais": "Ecuador", "nombre": "Rafting en el río Pastaza", "categoria": "Aventura", "descripcion": "Rafting clase III-IV con guía certificado y equipo incluido.", "costo_usd": 35, "nivel_presupuesto": "medio", "franja_recomendada": "mañana", "duracion_horas": 4, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "rafting;rio;adrenalina;deporte", "rating": 4.8}, {"id": 21, "destino": "Baños", "pais": "Ecuador", "nombre": "Termas de la Virgen", "categoria": "Relax", "descripcion": "Piscinas termales al pie de la cascada en el centro de Baños.", "costo_usd": 4, "nivel_presupuesto": "economico", "franja_recomendada": "noche", "duracion_horas": 2, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "termas;descanso;noche", "rating": 4.2}, {"id": 22, "destino": "Baños", "pais": "Ecuador", "nombre": "Puenting y canopy", "categoria": "Aventura", "descripcion": "Salto desde el puente San Francisco y tirolesa sobre el cañón.", "costo_usd": 25, "nivel_presupuesto": "medio", "franja_recomendada": "tarde", "duracion_horas": 2, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "puenting;canopy;adrenalina", "rating": 4.6}, {"id": 23, "destino": "Baños", "pais": "Ecuador", "nombre": "Café y melcochas en el centro", "categoria": "Gastronomía", "descripcion": "Degustación de melcocha artesanal y café local; opciones veganas.", "costo_usd": 6, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 1, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "dulces;cafe;tradicion", "rating": 4.4}, {"id": 24, "destino": "Baños", "pais": "Ecuador", "nombre": "Spa de lujo con vista al volcán", "categoria": "Relax", "descripcion": "Circuito hidrotermal, masaje con piedras volcánicas y cena saludable.", "costo_usd": 120, "nivel_presupuesto": "lujo", "franja_recomendada": "tarde", "duracion_horas": 4, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "spa;bienestar;lujo;masaje", "rating": 4.9}, {"id": 25, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Estación Científica Charles Darwin", "categoria": "Cultura e historia", "descripcion": "Centro de crianza de tortugas gigantes en Puerto Ayora.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 2, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "tortugas;ciencia;conservacion", "rating": 4.6}, {"id": 26, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Bahía Tortuga", "categoria": "Aire libre", "descripcion": "Playa de arena blanca con iguanas marinas; caminata de 2,5 km.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 3, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "playa;iguanas;naturaleza;snorkel", "rating": 4.9}, {"id": 27, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Tour de snorkel en Kicker Rock", "categoria": "Aventura", "descripcion": "Snorkel con lobos marinos, tortugas y tiburones de arrecife.", "costo_usd": 160, "nivel_presupuesto": "lujo", "franja_recomendada": "mañana", "duracion_horas": 8, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "snorkel;buceo;fauna;barco", "rating": 4.9}, {"id": 28, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Las Grietas", "categoria": "Aire libre", "descripcion": "Piscina natural de agua cristalina entre paredes de roca volcánica.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 2, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "nado;naturaleza;fotografia", "rating": 4.7}, {"id": 29, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Calle de los Kioskos", "categoria": "Gastronomía", "descripcion": "Mariscos frescos y pescado al ajillo en ambiente local.", "costo_usd": 18, "nivel_presupuesto": "economico", "franja_recomendada": "noche", "duracion_horas": 1.5, "accesible": "si", "apto_vegetariano": "no", "etiquetas": "mariscos;pescado;local;noche", "rating": 4.5}, {"id": 30, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Rancho El Chato", "categoria": "Aire libre", "descripcion": "Tortugas gigantes en estado silvestre en la parte alta de Santa Cruz.", "costo_usd": 10, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 2.5, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "tortugas;fauna;naturaleza", "rating": 4.8}, {"id": 31, "destino": "Galápagos", "pais": "Ecuador", "nombre": "Cena frente al mar en Puerto Ayora", "categoria": "Gastronomía", "descripcion": "Restaurante con menú de autor y opciones vegetarianas.", "costo_usd": 55, "nivel_presupuesto": "lujo", "franja_recomendada": "noche", "duracion_horas": 2, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "alta cocina;mar;romantico", "rating": 4.6}, {"id": 32, "destino": "Guayaquil", "pais": "Ecuador", "nombre": "Malecón 2000", "categoria": "Aire libre", "descripcion": "Paseo junto al río Guayas con jardines, museos y la Perla (noria).", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 2.5, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "paseo;rio;familia;ciudad", "rating": 4.7}, {"id": 33, "destino": "Guayaquil", "pais": "Ecuador", "nombre": "Barrio Las Peñas y Cerro Santa Ana", "categoria": "Cultura e historia", "descripcion": "Subida de 444 escalones entre casas coloridas hasta el faro.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 2, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "miradores;historia;fotografia", "rating": 4.7}, {"id": 34, "destino": "Guayaquil", "pais": "Ecuador", "nombre": "Parque Seminario (de las Iguanas)", "categoria": "Aire libre", "descripcion": "Parque céntrico con iguanas terrestres frente a la Catedral.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 1, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "iguanas;familia;centro", "rating": 4.5}, {"id": 35, "destino": "Guayaquil", "pais": "Ecuador", "nombre": "Encebollado en el centro", "categoria": "Gastronomía", "descripcion": "Desayuno típico costeño: encebollado con chifles y limón.", "costo_usd": 5, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 1, "accesible": "si", "apto_vegetariano": "no", "etiquetas": "comida tipica;desayuno;pescado", "rating": 4.6}, {"id": 36, "destino": "Guayaquil", "pais": "Ecuador", "nombre": "Museo Antropológico y de Arte Contemporáneo (MAAC)", "categoria": "Cultura e historia", "descripcion": "Colecciones arqueológicas y arte contemporáneo ecuatoriano.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 2, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "museo;arte;arqueologia", "rating": 4.5}, {"id": 37, "destino": "Guayaquil", "pais": "Ecuador", "nombre": "Cena en Puerto Santa Ana", "categoria": "Gastronomía", "descripcion": "Restaurantes y bares junto al río con vista nocturna.", "costo_usd": 40, "nivel_presupuesto": "medio", "franja_recomendada": "noche", "duracion_horas": 2, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "vida nocturna;rio;cocteles", "rating": 4.5}, {"id": 38, "destino": "Cusco", "pais": "Perú", "nombre": "Machu Picchu (excursión de día)", "categoria": "Cultura e historia", "descripcion": "Tren a Aguas Calientes y visita guiada a la ciudadela inca.", "costo_usd": 180, "nivel_presupuesto": "lujo", "franja_recomendada": "mañana", "duracion_horas": 12, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "inca;patrimonio;tren;maravilla", "rating": 5.0}, {"id": 39, "destino": "Cusco", "pais": "Perú", "nombre": "Qorikancha y centro histórico", "categoria": "Cultura e historia", "descripcion": "Templo inca del Sol bajo el convento de Santo Domingo.", "costo_usd": 5, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 2, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "inca;historia;arquitectura", "rating": 4.7}, {"id": 40, "destino": "Cusco", "pais": "Perú", "nombre": "Mercado de San Pedro", "categoria": "Gastronomía", "descripcion": "Jugos, sopas y almuerzos típicos a bajo costo.", "costo_usd": 6, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 1.5, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "mercado;comida tipica;local", "rating": 4.5}, {"id": 41, "destino": "Cusco", "pais": "Perú", "nombre": "Montaña de Siete Colores", "categoria": "Aventura", "descripcion": "Caminata de altura hasta Vinicunca (5.036 m); salida de madrugada.", "costo_usd": 45, "nivel_presupuesto": "medio", "franja_recomendada": "mañana", "duracion_horas": 10, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "senderismo;altura;montaña", "rating": 4.6}, {"id": 42, "destino": "Cusco", "pais": "Perú", "nombre": "Valle Sagrado y Pisac", "categoria": "Aire libre", "descripcion": "Terrazas incas, mercado artesanal y paisajes andinos.", "costo_usd": 35, "nivel_presupuesto": "medio", "franja_recomendada": "tarde", "duracion_horas": 6, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "valle;artesania;paisaje", "rating": 4.8}, {"id": 43, "destino": "Cusco", "pais": "Perú", "nombre": "Cena show con música andina", "categoria": "Gastronomía", "descripcion": "Cocina novoandina con espectáculo de danzas tradicionales.", "costo_usd": 40, "nivel_presupuesto": "medio", "franja_recomendada": "noche", "duracion_horas": 2, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "musica;danza;novoandino", "rating": 4.4}, {"id": 44, "destino": "Cartagena", "pais": "Colombia", "nombre": "Ciudad Amurallada", "categoria": "Cultura e historia", "descripcion": "Caminata por calles coloniales, balcones y plazas.", "costo_usd": 0, "nivel_presupuesto": "economico", "franja_recomendada": "tarde", "duracion_horas": 3, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "colonial;patrimonio;fotografia", "rating": 4.8}, {"id": 45, "destino": "Cartagena", "pais": "Colombia", "nombre": "Castillo San Felipe de Barajas", "categoria": "Cultura e historia", "descripcion": "Fortaleza militar española con túneles y vistas a la ciudad.", "costo_usd": 10, "nivel_presupuesto": "economico", "franja_recomendada": "mañana", "duracion_horas": 2, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "fortaleza;historia;miradores", "rating": 4.7}, {"id": 46, "destino": "Cartagena", "pais": "Colombia", "nombre": "Islas del Rosario", "categoria": "Relax", "descripcion": "Día de playa y snorkel en islas de arrecife coralino.", "costo_usd": 70, "nivel_presupuesto": "medio", "franja_recomendada": "mañana", "duracion_horas": 8, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "playa;snorkel;barco;descanso", "rating": 4.5}, {"id": 47, "destino": "Cartagena", "pais": "Colombia", "nombre": "Barrio Getsemaní de noche", "categoria": "Gastronomía", "descripcion": "Arte urbano, comida callejera y salsa en vivo.", "costo_usd": 20, "nivel_presupuesto": "economico", "franja_recomendada": "noche", "duracion_horas": 3, "accesible": "parcial", "apto_vegetariano": "si", "etiquetas": "vida nocturna;salsa;street art", "rating": 4.7}, {"id": 48, "destino": "Cartagena", "pais": "Colombia", "nombre": "Restaurante de cocina caribeña de autor", "categoria": "Gastronomía", "descripcion": "Menú degustación caribeño con mariscos y opción vegetariana.", "costo_usd": 90, "nivel_presupuesto": "lujo", "franja_recomendada": "noche", "duracion_horas": 2.5, "accesible": "si", "apto_vegetariano": "si", "etiquetas": "alta cocina;caribe;mariscos", "rating": 4.8}, {"id": 49, "destino": "Cartagena", "pais": "Colombia", "nombre": "Volcán de lodo El Totumo", "categoria": "Aventura", "descripcion": "Baño de lodo en un pequeño volcán y enjuague en la ciénaga.", "costo_usd": 30, "nivel_presupuesto": "medio", "franja_recomendada": "mañana", "duracion_horas": 5, "accesible": "no", "apto_vegetariano": "si", "etiquetas": "lodo;experiencia;excursion", "rating": 4.1}], "actividades_genericas": {"mañana": ["Desayuno tranquilo y paseo por el barrio del alojamiento", "Visita a un mercado local de la zona"], "tarde": ["Tiempo libre para compras de artesanías", "Café en una plaza céntrica y caminata corta"], "noche": ["Cena ligera cerca del alojamiento", "Descanso y preparación del día siguiente"]}};
+
+/* ======================================================================
+   CONSTANTES DE DOMINIO
+   ====================================================================== */
+const INTERESES = {
+  "Aire libre":         {icon:"🌿", c:"var(--c-aire)",     kw:["aire libre","naturaleza","parque","sendero","senderismo","playa","laguna","paisaje","mirador","bosque","valle"]},
+  "Cultura e historia": {icon:"🏛️", c:"var(--c-cultura)",  kw:["cultura","historia","museo","patrimonio","colonial","inca","arte","iglesia","arqueologia","artesania","tradicion","fortaleza"]},
+  "Gastronomía":        {icon:"🍲", c:"var(--c-gastro)",   kw:["gastronomia","comida","mercado","restaurante","cena","cocina","degustacion","cafe","tipica","mariscos","dulces"]},
+  "Relax":              {icon:"♨️", c:"var(--c-relax)",    kw:["relax","spa","termas","descanso","masaje","bienestar","playa"]},
+  "Aventura":           {icon:"🧗", c:"var(--c-aventura)", kw:["aventura","adrenalina","rafting","bicicleta","snorkel","puenting","canopy","montana","senderismo","buceo","altura"]}
+};
+const NIVELES = {
+  economico:{label:"Económico", max:60,  rank:0, comidas:20},
+  medio:    {label:"Medio",     max:150, rank:1, comidas:45},
+  lujo:     {label:"Lujo",      max:400, rank:2, comidas:110}
+};
+const FIELDS = {
+  id:["id","codigo","code"],
+  destino:["destino","ciudad","city","destination","localidad"],
+  pais:["pais","country"],
+  nombre:["nombre","atraccion","lugar","actividad","name","sitio","titulo"],
+  categoria:["categoria","category","tipo","type","clase"],
+  descripcion:["descripcion","description","detalle","resena","review","resumen"],
+  costo:["costo_usd","costo","precio","price","cost","precio_usd","valor"],
+  nivel:["nivel_presupuesto","presupuesto","budget","nivel","rango_precio"],
+  franja:["franja_recomendada","franja","momento","horario","momento_del_dia"],
+  duracion:["duracion_horas","duracion","horas","duration"],
+  accesible:["accesible","accesibilidad","accessible","movilidad"],
+  vegetariano:["apto_vegetariano","vegetariano","vegetarian","vegano"],
+  etiquetas:["etiquetas","tags","keywords","palabras_clave"],
+  rating:["rating","calificacion","puntuacion","valoracion","estrellas"],
+  imagen:["imagen_url","imagen","foto","image","image_url","url_imagen"]
+};
+const RESTR = [["Vegetariano","soy vegetariano"],["Movilidad reducida","movilidad reducida"],["Sin actividades nocturnas","sin actividades nocturnas"],["Evitar la altura","evitar la altura"],["Viajo con niños","viajo con niños"],["No madrugar","no madrugar"]];
+const QUICK_F = ["Más económico","Más gastronomía","Más relajado, con tarde libre","Más aventura","Menos traslados"];
+const STOP = new Set("para por con sin que los las del una uno unos unas mas muy pero como este esta esto quiero quisiera tengo soy viajo viajamos nuestro nuestra mi mis me nos algo cada todo toda todos todas desde hasta entre sobre tambien".split(" "));
+
+/* Proveedores de IA. Los identificadores de modelo cambian con frecuencia:
+   el botón “Ver modelos disponibles” consulta la lista real del proveedor. */
+const PROVIDERS = {
+  gemini:{name:"Google Gemini", short:"Gemini", tag:"Gratis con límites", free:true, type:"gemini",
+    models:["gemini-3.8-flash","gemini-3.7-flash","gemini-3.5-flash-lite"],
+    keyUrl:"https://aistudio.google.com/apikey",
+    note:"Nivel gratuito de Google AI Studio sin tarjeta. En el plan gratuito, Google puede usar los datos para mejorar sus productos."},
+  groq:{name:"Groq", short:"Groq", tag:"Gratis con límites", free:true, type:"openai", base:"https://api.groq.com/openai/v1",
+    models:["openai/gpt-oss-120b","openai/gpt-oss-20b","qwen/qwen3-32b"],
+    keyUrl:"https://console.groq.com/keys",
+    note:"Inferencia muy rápida con modelos abiertos (GPT-OSS de OpenAI, Qwen)."},
+  openrouter:{name:"OpenRouter", short:"OpenRouter", tag:"Modelos gratuitos", free:true, type:"openai", base:"https://openrouter.ai/api/v1",
+    models:["openrouter/free","openai/gpt-oss-120b:free"],
+    keyUrl:"https://openrouter.ai/keys",
+    note:"Una sola clave para muchos modelos. “openrouter/free” elige automáticamente un modelo gratuito; tienen límite diario de solicitudes."},
+  openai:{name:"OpenAI GPT-4o-mini", short:"GPT-4o-mini", tag:"De pago", free:false, type:"openai", base:"https://api.openai.com/v1",
+    models:["gpt-4o-mini"],
+    keyUrl:"https://platform.openai.com/api-keys",
+    note:"Incluido por el enunciado. Requiere saldo en la cuenta de OpenAI."}
+};
+
+/* ======================================================================
+   ESTADO
+   ====================================================================== */
+const S = {
+  data:[], schema:null, source:"", headers:[],
+  retrieval:null, prompt:null, it:null, checks:null,
+  versions:[], cur:-1, feedback:[], lastMode:"mock",
+  provider:"gemini", keys:{gemini:"",groq:"",openrouter:"",openai:""},
+  models:Object.fromEntries(Object.entries(PROVIDERS).map(([k,v])=>[k,v.models[0]])),
+  temp:0.7, imgMode:"wiki", remember:false, connErr:null, noticeClosed:false, fbRating:"ajustes"
+};
+
+/* ======================================================================
+   UTILIDADES
+   ====================================================================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
+const num = v => { const n = parseFloat(String(v ?? "").replace(/[^0-9.,-]/g,"").replace(",", ".")); return isFinite(n) ? n : 0; };
+const money = n => "$" + Math.round(n).toLocaleString("es-EC");
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const store = { get(k){ try{ return JSON.parse(localStorage.getItem("viajeia."+k)); }catch{ return null; } }, set(k,v){ try{ localStorage.setItem("viajeia."+k, JSON.stringify(v)); }catch{} }, del(k){ try{ localStorage.removeItem("viajeia."+k); }catch{} } };
+function toast(msg, ms=2800){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"), ms); }
+function download(name, text, type="application/json"){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+function catInfo(cat){ const n = norm(cat); const k = Object.keys(INTERESES).find(i => n.includes(norm(i).split(" ")[0])); return k ? INTERESES[k] : {icon:"🧭", c:"var(--indigo)"}; }
+function updatePipe(){}  // compatibilidad con la lógica compartida
+
+/* ======================================================================
+   IMÁGENES · Wikipedia (fotos reales, sin clave) y Pollinations (IA)
+   ====================================================================== */
+const IMG = { mem:new Map(), queue:[], active:0, MAX:4 };
+function imgSlot(q, cat, opts={}){
+  const ci = catInfo(cat||"");
+  return `<div class="img" style="--cc:${ci.c}" data-icon="${ci.icon}" ${q?`data-q="${esc(q)}"`:""} ${opts.exact?'data-exact="1"':""} ${opts.src?`data-src="${esc(opts.src)}"`:""} ${opts.ai?`data-ai="${esc(opts.ai)}"`:""}></div>`;
+}
+async function wikiImage(q, exact){
+  const key = (exact?"e:":"s:") + norm(q);
+  if (IMG.mem.has(key)) return IMG.mem.get(key);
+  const cached = store.get("img."+key); if (cached !== null && cached !== undefined){ IMG.mem.set(key, cached); return cached; }
+  const p = (async () => {
+    for (const lang of ["es","en"]){
+      const base = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages|info&inprop=url&piprop=thumbnail&pithumbsize=900&redirects=1`;
+      const url = exact ? `${base}&titles=${encodeURIComponent(q)}` : `${base}&generator=search&gsrlimit=4&gsrsearch=${encodeURIComponent(q)}`;
+      try {
+        const r = await fetch(url); if (!r.ok) continue;
+        const d = await r.json(); const pages = Object.values(d.query?.pages || {}).sort((a,b)=>(a.index||0)-(b.index||0));
+        const hit = pages.find(pg => pg.thumbnail?.source);
+        if (hit) return {src:hit.thumbnail.source, page:hit.fullurl, title:hit.title};
+      } catch { return null; }
+    }
+    return null;
+  })();
+  IMG.mem.set(key, p);
+  const res = await p; IMG.mem.set(key, res); if (res !== null) store.set("img."+key, res);
+  return res;
+}
+function pollinationsUrl(prompt, w=1600, h=700){
+  let seed = 0; for (const ch of prompt) seed = (seed*31 + ch.charCodeAt(0)) % 99991;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
+}
+function setImg(el, info){
+  if (!info?.src) return;
+  const im = new Image(); im.alt = ""; im.loading = "lazy"; im.decoding = "async";
+  im.onload = () => im.classList.add("ok"); im.onerror = () => im.remove();
+  im.src = info.src; el.appendChild(im);
+  if (info.page){ const a=document.createElement("a"); a.className="cr"; a.href=info.page; a.target="_blank"; a.rel="noopener"; a.textContent="Wikipedia"; a.title="Foto: "+(info.title||""); el.appendChild(a); }
+}
+function hydrateImages(root=document){
+  if (S.imgMode === "off") return;
+  root.querySelectorAll(".img:not([data-done])").forEach(el => {
+    el.dataset.done = "1";
+    if (el.dataset.src){ setImg(el, {src:el.dataset.src}); return; }
+    if (S.imgMode === "ia" && el.dataset.ai){ setImg(el, {src:pollinationsUrl(el.dataset.ai, 1200, 600)}); return; }
+    if (!el.dataset.q) return;
+    IMG.queue.push(el); pumpImg();
+  });
+}
+function pumpImg(){
+  while (IMG.active < IMG.MAX && IMG.queue.length){
+    const el = IMG.queue.shift(); IMG.active++;
+    wikiImage(el.dataset.q, !!el.dataset.exact).then(info => {
+      if (!info && el.dataset.exact) return wikiImage(el.dataset.q, false);
+      return info;
+    }).then(info => setImg(el, info)).finally(() => { IMG.active--; pumpImg(); });
+  }
+}
+let heroTimer;
+function setHero(dest){
+  clearTimeout(heroTimer);
+  heroTimer = setTimeout(async () => {
+    const bg = $("#heroBg"), cr = $("#heroCredit");
+    bg.classList.remove("on"); cr.hidden = true;
+    if (!dest || S.imgMode === "off") return;
+    let info = null;
+    if (S.imgMode === "ia") info = {src:pollinationsUrl(`${dest}, travel photography, wide landscape, golden hour, people exploring`)};
+    else info = await wikiImage(dest, true) || await wikiImage(dest, false);
+    if (!info?.src || norm($("#dest").value) !== norm(dest)) return;
+    const src = info.src.replace(/\/(\d+)px-/, "/1600px-");
+    const im = new Image();
+    im.onload = () => { bg.style.backgroundImage = `url("${src}")`; bg.classList.add("on"); if (info.page){ cr.href = info.page; cr.textContent = "Foto de Wikipedia: " + info.title; cr.hidden = false; } else if (S.imgMode==="ia"){ cr.removeAttribute("href"); cr.textContent = "Imagen generada con IA (Pollinations)"; cr.hidden = false; } };
+    im.onerror = () => { if (src !== info.src){ im.onerror = null; im.src = info.src; } };
+    im.src = src;
+  }, 350);
+}
+
+/* ======================================================================
+   MÓDULO 1 · CONEXIÓN CON LA IA
+   ====================================================================== */
+function hasKey(){ return (S.keys[S.provider]||"").trim().length >= 20; }
+function P(){ return PROVIDERS[S.provider]; }
+function refreshStatus(err){
+  if (err !== undefined) S.connErr = err;
+  const st = $("#status");
+  if (S.connErr){ st.className="pill err"; st.innerHTML="<i></i>Error"; st.title = S.connErr; }
+  else if (hasKey()){ st.className="pill act"; st.innerHTML="<i></i>Activo"; st.title = `${P().name}, modelo ${S.models[S.provider]}`; }
+  else { st.className="pill pend"; st.innerHTML="<i></i>Pendiente"; st.title = "Sin API Key: modo simulado"; }
+  // Mensaje pedagógico
+  const n = $("#notice");
+  if (S.connErr){
+    n.innerHTML = `<div class="notice-in"><span>⚠️</span><span><b>No se pudo conectar con ${esc(P().name)}.</b> ${esc(S.connErr)} Puedes seguir en modo simulado.</span><button class="linkbtn" data-open>Revisar conexión</button></div>`;
+  } else if (!hasKey() && !S.noticeClosed){
+    n.innerHTML = `<div class="notice-in"><span>💡</span><span><b>Conexión con el modelo pendiente.</b> Estás en modo simulado: la carga del archivo, el RAG, el prompt y los filtros funcionan de verdad; solo la respuesta del LLM la imita un simulador local. <button class="linkbtn" data-open>Conectar una IA gratuita</button></span><button class="x" aria-label="Cerrar aviso" data-close>×</button></div>`;
+  } else n.innerHTML = "";
+  n.querySelector("[data-open]")?.addEventListener("click", openDrawer);
+  n.querySelector("[data-close]")?.addEventListener("click", () => { S.noticeClosed = true; refreshStatus(); });
+  // Llamadas a la acción
+  const pri = $("#btnPrimary"), sec = $("#btnSecondary");
+  if (hasKey()){
+    pri.textContent = `Crear itinerario con ${P().short}`; pri.onclick = () => generate("api");
+    sec.textContent = "Simular con Mock Data"; sec.onclick = () => generate("mock");
+    $("#ctaNote").textContent = `Modelo ${S.models[S.provider]}`;
+  } else {
+    pri.textContent = "Simular con Mock Data"; pri.onclick = () => generate("mock");
+    sec.textContent = "Conectar una IA gratuita"; sec.onclick = openDrawer;
+    $("#ctaNote").textContent = "Sin clave, el itinerario se genera con un simulador local.";
+  }
+  // Sincroniza cabecera y panel
+  $("#provider").value = S.provider;
+  if (document.activeElement !== $("#apiKey")) $("#apiKey").value = S.keys[S.provider] || "";
+  if (document.activeElement !== $("#dKey")) $("#dKey").value = S.keys[S.provider] || "";
+  if (document.activeElement !== $("#dModel")) $("#dModel").value = S.models[S.provider];
+  $("#dKeyHint").innerHTML = `<a href="${P().keyUrl}" target="_blank" rel="noopener">Obtener una clave de ${esc(P().name)}</a>. ${esc(P().note)}`;
+  if (S.remember) store.set("conn", {keys:S.keys, models:S.models, provider:S.provider});
+}
+function setProvider(p){ S.provider = p; S.connErr = null; $$("#provs input").forEach(i=>i.checked = i.value===p); $("#modelList").innerHTML = P().models.map(m=>`<option value="${esc(m)}">`).join(""); $("#modelsHint").textContent=""; refreshStatus(); }
+function setKey(v){ S.keys[S.provider] = v.trim(); S.connErr = null; refreshStatus(); }
+function openDrawer(){ $("#drawer").classList.add("on"); $("#scrim").classList.add("on"); $("#drawer").setAttribute("aria-hidden","false"); setTimeout(()=>$("#dKey").focus(), 200); }
+function closeDrawer(){ $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); $("#drawer").setAttribute("aria-hidden","true"); $("#btnConn").focus(); }
+
+async function fetchT(url, opts, ms=90000){
+  const c = new AbortController(); const t = setTimeout(()=>c.abort(), ms);
+  try { return await fetch(url, {...opts, signal:c.signal}); }
+  catch(e){ throw new Error(e.name==="AbortError" ? "Tiempo de espera agotado." : "Error de red o CORS (revisa tu conexión a internet)."); }
+  finally { clearTimeout(t); }
+}
+async function callLLM(system, user, json=true){
+  const prov = P(), key = S.keys[S.provider].trim(), model = S.models[S.provider].trim();
+  if (prov.type === "gemini"){
+    const body = {systemInstruction:{parts:[{text:system}]}, contents:[{role:"user", parts:[{text:user}]}], generationConfig:{temperature:S.temp, ...(json?{responseMimeType:"application/json"}:{})}};
+    const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
+    const txt = (d.candidates?.[0]?.content?.parts || []).filter(p=>!p.thought).map(p=>p.text||"").join("");
+    if (!txt) throw new Error("Respuesta vacía (posible bloqueo por los filtros del proveedor).");
+    return txt;
+  }
+  const headers = {"Content-Type":"application/json","Authorization":"Bearer "+key};
+  if (S.provider === "openrouter") headers["X-Title"] = "ViajeIA";
+  const send = async (useJson) => {
+    const body = {model, temperature:S.temp, messages:[{role:"system",content:system},{role:"user",content:user}], ...(useJson?{response_format:{type:"json_object"}}:{})};
+    const r = await fetchT(`${prov.base}/chat/completions`, {method:"POST", headers, body:JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    return {r, d};
+  };
+  let {r, d} = await send(json);
+  // Algunos modelos no admiten modo JSON: se reintenta sin él (el prompt ya exige JSON).
+  if (!r.ok && json && r.status === 400) ({r, d} = await send(false));
+  if (!r.ok) throw new Error(d.error?.message || (typeof d.error === "string" ? d.error : `HTTP ${r.status}`));
+  const txt = d.choices?.[0]?.message?.content || "";
+  if (!txt) throw new Error("El modelo devolvió una respuesta vacía. Prueba otro modelo.");
+  return txt;
+}
+async function listModels(){
+  const prov = P(), key = (S.keys[S.provider]||"").trim(), out = $("#modelsHint");
+  if (!key && S.provider !== "openrouter"){ out.textContent = "Primero pega tu clave."; return; }
+  out.textContent = "Consultando…";
+  try {
+    let ids = [];
+    if (prov.type === "gemini"){
+      const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`, {});
+      const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || r.status);
+      ids = (d.models||[]).filter(m => (m.supportedGenerationMethods||[]).includes("generateContent") && /gemini/.test(m.name) && !/image|tts|audio|live|embedding|robotics/.test(m.name)).map(m=>m.name.replace("models/",""));
+    } else {
+      const r = await fetchT(`${prov.base}/models`, {headers: key ? {"Authorization":"Bearer "+key} : {}});
+      const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || r.status);
+      ids = (d.data||[]).map(m=>m.id);
+      if (S.provider === "openrouter") ids = ["openrouter/free", ...ids.filter(i=>i.endsWith(":free"))];
+      if (S.provider === "groq") ids = ids.filter(i=>!/whisper|guard|tts|orpheus|safeguard/.test(i));
+      if (S.provider === "openai") ids = ids.filter(i=>/^gpt-|^o\d/.test(i));
+    }
+    ids = [...new Set(ids)].sort();
+    $("#modelList").innerHTML = ids.map(m=>`<option value="${esc(m)}">`).join("");
+    out.textContent = `${ids.length} modelos disponibles. Escribe o elige uno en el campo.`;
+  } catch(e){ out.textContent = "No se pudo obtener la lista: " + e.message; }
+}
+
+/* ======================================================================
+   MÓDULO 3 · CARGA E INTERPRETACIÓN DE DATOS
+   ====================================================================== */
+function detectSchema(headers){
+  const map = {}, used = new Set();
+  const nh = headers.map(h => norm(h).replace(/\s+/g,"_"));
+  for (const [field, syns] of Object.entries(FIELDS)){
+    let idx = nh.findIndex((h,i)=>!used.has(i) && syns.includes(h));
+    if (idx < 0) idx = nh.findIndex((h,i)=>!used.has(i) && syns.some(s=>h.includes(s)));
+    if (idx >= 0){ map[field] = headers[idx]; used.add(idx); }
+  }
+  return map;
+}
+function inferNivel(cost){ return cost <= 15 ? "economico" : cost <= 60 ? "medio" : "lujo"; }
+function normNivel(v, cost){
+  const n = norm(v);
+  if (/econ|bajo|low|barato/.test(n)) return "economico";
+  if (/medi|mid|moder/.test(n)) return "medio";
+  if (/lujo|alto|high|premium|lux/.test(n)) return "lujo";
+  return inferNivel(cost);
+}
+function normFranja(v, cat){
+  const n = norm(v);
+  if (/man|morn|am/.test(n)) return "mañana";
+  if (/tard|after|pm/.test(n)) return "tarde";
+  if (/noch|night|even/.test(n)) return "noche";
+  return /gastr/.test(norm(cat)) ? "noche" : "tarde";
+}
+function toRecords(rows, schema){
+  const g = (r,f) => schema[f] ? r[schema[f]] : "";
+  return rows.map((r,i) => {
+    const costo = num(g(r,"costo"));
+    const cat = String(g(r,"categoria") || "General").trim();
+    return {
+      id: String(g(r,"id") || (i+1)).trim(),
+      destino: String(g(r,"destino")||"").trim(),
+      pais: String(g(r,"pais")||"").trim(),
+      nombre: String(g(r,"nombre")||"").trim(),
+      categoria: cat,
+      descripcion: String(g(r,"descripcion")||"").trim(),
+      costo,
+      nivel: normNivel(g(r,"nivel"), costo),
+      franja: normFranja(g(r,"franja"), cat),
+      duracion: num(g(r,"duracion")) || 2,
+      accesible: schema.accesible ? norm(g(r,"accesible")) : "desconocido",
+      vegetariano: schema.vegetariano ? norm(g(r,"vegetariano")) : "desconocido",
+      etiquetas: String(g(r,"etiquetas")||"").split(/[;,|]/).map(s=>s.trim()).filter(Boolean),
+      rating: num(g(r,"rating")) || 4,
+      imagen: String(g(r,"imagen")||"").trim()
+    };
+  }).filter(r => r.nombre);
+}
+function simpleCSV(text){
+  // Lector de respaldo (si PapaParse no carga desde el CDN). Soporta comillas.
+  const rows=[]; let row=[], f="", q=false;
+  for (let i=0;i<text.length;i++){
+    const c=text[i];
+    if (q){ if (c==='"'){ if (text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if (c==='"') q=true;
+    else if (c===','){ row.push(f); f=""; }
+    else if (c==='\n'||c==='\r'){ if (c==='\r'&&text[i+1]==='\n') i++; row.push(f); rows.push(row); row=[]; f=""; }
+    else f+=c;
+  }
+  if (f||row.length){ row.push(f); rows.push(row); }
+  const h = rows.shift().map(s=>s.trim());
+  return { headers:h, rows: rows.filter(r=>r.some(x=>x.trim())).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]??""]))) };
+}
+
+function loadRows(headers, rows, source, silent){
+  const schema = detectSchema(headers);
+  if (!schema.nombre){ toast("No se encontró una columna con el nombre de la actividad o lugar."); renderDsInfo("error", headers, schema); $("#kbSchema").open = true; return; }
+  S.headers = headers; S.schema = schema; S.source = source;
+  S.data = toRecords(rows, schema);
+  renderDsInfo("ok", headers, schema);
+  renderDestinations();
+  if (!silent) toast(`Se cargaron ${S.data.length} registros desde ${source}`);
+}
+function handleFile(file){
+  if (!file) return;
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (ext === "csv"){
+    if (window.Papa){
+      Papa.parse(file, {header:true, skipEmptyLines:true, transformHeader:h=>h.trim(), complete: res => loadRows(res.meta.fields, res.data, file.name), error: e => toast("No se pudo leer el CSV: "+e.message)});
+    } else {
+      const fr = new FileReader(); fr.onload = () => { const p = simpleCSV(fr.result.replace(/^﻿/,"")); loadRows(p.headers, p.rows, file.name+" (lector de respaldo)"); }; fr.readAsText(file, "UTF-8");
+    }
+  } else if (ext === "xlsx" || ext === "xls"){
+    if (!window.XLSX){ toast("Para leer Excel se necesita internet (SheetJS). Exporta el archivo como CSV."); return; }
+    const fr = new FileReader();
+    fr.onload = () => {
+      const wb = XLSX.read(fr.result, {type:"array"}); const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:""}); const headers = rows.length ? Object.keys(rows[0]) : [];
+      loadRows(headers, rows, `${file.name}, hoja “${wb.SheetNames[0]}”`);
+    };
+    fr.readAsArrayBuffer(file);
+  } else toast("Formato no admitido. Usa un archivo CSV o XLSX.");
+}
+function loadSample(silent){ const rows = MOCK_DATA.dataset_ejemplo; loadRows(Object.keys(rows[0]), rows, "datos de ejemplo", silent===true); }
+function sampleCSV(){
+  const rows = MOCK_DATA.dataset_ejemplo, h = Object.keys(rows[0]);
+  if (window.Papa) return Papa.unparse(rows);
+  const q = v => /[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : v;
+  return [h.join(","), ...rows.map(r=>h.map(k=>q(r[k])).join(","))].join("\n");
+}
+function renderDsInfo(state, headers, schema){
+  if (state==="error"){ $("#dsInfo").innerHTML = `<div class="errbox">No se pudo interpretar la estructura. Columnas encontradas: ${headers.map(esc).join(", ")}. Se necesita al menos una columna de nombre (nombre, lugar, actividad…).</div>`; return; }
+  const dests = new Set(S.data.map(r=>r.destino)); const cats = new Set(S.data.map(r=>r.categoria));
+  $("#dsMeta").textContent = `${S.data.length} registros de ${S.source}`;
+  $("#kbSrc").textContent = `En uso: ${S.source}, con ${S.data.length} registros, ${dests.size} destinos y ${cats.size} categorías.`;
+  const mapped = Object.keys(FIELDS).map(f=>`<tr><td>${f}</td><td>${schema[f]?`<span class="tag g">${esc(schema[f])}</span>`:`<span class="tag y">no encontrada</span>`}</td></tr>`).join("");
+  $("#dsInfo").innerHTML = `<p class="hint">El sistema reconoce las columnas por sus nombres o sinónimos (por ejemplo “ciudad” equivale a “destino”). Se detectaron ${Object.keys(schema).length} de ${Object.keys(FIELDS).length} campos.</p>
+    <div class="tscroll" style="max-height:280px;max-width:560px"><table class="t"><tr><th>Campo interno</th><th>Columna del archivo</th></tr>${mapped}</table></div>`;
+}
+function renderDestinations(){
+  const by = {};
+  S.data.forEach(r => { const k = r.destino || "Sin destino"; (by[k] ||= {n:0, pais:r.pais, cats:{}}); by[k].n++; by[k].cats[r.categoria]=(by[k].cats[r.categoria]||0)+1; });
+  const dests = Object.keys(by).sort();
+  $("#destList").innerHTML = dests.map(d=>`<option value="${esc(d)}">`).join("");
+  const cur = norm($("#dest").value);
+  $("#destRow").innerHTML = dests.map(d => {
+    const top = Object.entries(by[d].cats).sort((a,b)=>b[1]-a[1])[0]?.[0] || "";
+    return `<button class="dcard" data-d="${esc(d)}" ${norm(d)===cur?'aria-current="true"':""}>${imgSlot(d, top, {exact:1, ai:`${d} travel photography landscape`})}<span><b>${esc(d)}</b><small>${esc(by[d].pais||"")}${by[d].pais?", ":""}${by[d].n} lugares</small></span></button>`;
+  }).join("");
+  $$("#destRow .dcard").forEach(b => b.onclick = () => { $("#dest").value = b.dataset.d; onDestChange(); window.scrollTo({top:0, behavior:"smooth"}); });
+  hydrateImages($("#destRow"));
+}
+function fitWidth(el, extra=0){
+  let m = $("#measure"); if (!m){ m = document.createElement("span"); m.id="measure"; m.className="measure"; document.body.appendChild(m); }
+  const cs = getComputedStyle(el); m.style.font = cs.font; m.style.letterSpacing = cs.letterSpacing;
+  m.textContent = (el.tagName==="SELECT" ? el.selectedOptions[0].text : el.value) || el.placeholder || "  ";
+  el.style.width = Math.ceil(m.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + extra) + "px";
+}
+function fitAll(){ fitWidth($("#dest"), 6); fitWidth($("#budget"), 12); }
+function onDestChange(){
+  const d = $("#dest").value.trim();
+  fitWidth($("#dest"), 6);
+  $$("#destRow .dcard").forEach(b => b.toggleAttribute("aria-current", norm(b.dataset.d)===norm(d)));
+  setHero(d);
+}
+
+/* ======================================================================
+   MÓDULO 2 · PREFERENCIAS
+   ====================================================================== */
+function getPrefs(){
+  const chips = $$("#restrChips .chip[aria-pressed=true]").map(c=>c.dataset.v);
+  const free = $("#restrFree").value.trim();
+  return {
+    destino: $("#dest").value.trim(),
+    dias: clamp(parseInt($("#days").value)||1, 1, 14),
+    viajeros: clamp(parseInt($("#travelers").value)||1, 1, 12),
+    presupuesto: $("#budget").value,
+    intereses: $$("#interests .chip[aria-pressed=true]").map(c=>c.dataset.v),
+    restricciones: [...chips, free].filter(Boolean).join("; ")
+  };
+}
+function budgetHint(){ const N = NIVELES[$("#budget").value]; $("#budgetHint").textContent = `Presupuesto ${N.label.toLowerCase()}: hasta ${money(N.max)} por persona al día entre actividades y comidas.`; }
+
+function parseRestr(t){
+  const n = norm(t);
+  return {
+    vegetariano: /vegetar|vegan|sin carne|no como carne/.test(n),
+    movilidad: /movilidad|silla de ruedas|accesib|discapacidad|muleta|andador|no puedo caminar|adulto mayor|tercera edad/.test(n),
+    sinNoche: /sin (actividades )?noct|no .{0,20}noche|sin noche|dormir temprano|no salir de noche/.test(n),
+    sinAltura: /altura|soroche|mal de altura|altitud/.test(n),
+    ninos: /nino|hijos|familia|bebe/.test(n),
+    sinMadrugar: /no madrug|levantarme tarde|empezar tarde|sin madrug/.test(n)
+  };
+}
+function validatePrefs(p){
+  const e=[];
+  if (!p.destino) e.push("Indica un destino.");
+  if (!S.data.length) e.push("Carga un archivo de destinos o usa el dataset de ejemplo.");
+  return e;
+}
+
+function feedbackSignals(text){
+  const n = norm(text), boost = {};
+  for (const [k,v] of Object.entries(INTERESES)) if (v.kw.some(w=>n.includes(norm(w))) || n.includes(norm(k))) boost[k]=true;
+  return {
+    cheaper: /econom|barat|menos (costo|caro|gasto|dinero)|muy caro|ahorrar/.test(n),
+    relax: /relaj|tranquil|descans|menos actividad|cansad|tarde libre|calma/.test(n),
+    lessMoves: /menos traslad|cerca|sin viajes largos|menos desplaz/.test(n),
+    boost
+  };
+}
+function retrieve(p){
+  const R = parseRestr(p.restricciones);
+  const fbText = S.feedback.map(f=>f.text).join(" ");
+  const F = feedbackSignals(fbText);
+  const ur = NIVELES[p.presupuesto].rank;
+  const dn = norm(p.destino);
+  const anyDest = S.data.some(r => r.destino && (norm(r.destino).includes(dn) || dn.includes(norm(r.destino))));
+  const qTokens = norm(p.restricciones + " " + fbText).split(/[^a-z0-9ñ]+/).filter(w=>w.length>3 && !STOP.has(w));
+
+  const scored = S.data.map(r => {
+    const bd = []; let excl = false, flags = [];
+    const rd = norm(r.destino);
+    // 1) Destino
+    if (!rd || !dn) bd.push(["Destino", 0]);
+    else if (rd===dn || rd.includes(dn) || dn.includes(rd)) bd.push(["Destino", 5]);
+    else excl = true;
+    // 2) Categoría vs intereses
+    const text = norm([r.nombre, r.categoria, r.descripcion, r.etiquetas.join(" ")].join(" "));
+    const catHit = p.intereses.find(i => norm(r.categoria).includes(norm(i).split(" ")[0]) || INTERESES[i].kw.some(w=>norm(r.categoria).includes(norm(w))));
+    if (catHit) bd.push(["Interés: "+catHit, 3]);
+    const kwHits = p.intereses.flatMap(i=>INTERESES[i].kw).filter(w=>text.includes(norm(w)));
+    if (kwHits.length) bd.push(["Palabras clave", Math.min(2, kwHits.length*0.5)]);
+    // 3) Presupuesto
+    const rr = NIVELES[r.nivel]?.rank ?? 0;
+    bd.push(["Presupuesto", rr <= ur ? 1.5 : -2*(rr-ur)]);
+    // 4) Calidad (rating)
+    bd.push(["Rating", +((r.rating-4)*2).toFixed(1)]);
+    // 5) Restricciones
+    if (R.movilidad && r.accesible==="no"){ bd.push(["No accesible", -6]); flags.push("no accesible"); }
+    if (R.movilidad && r.accesible==="parcial"){ bd.push(["Accesibilidad parcial", -1]); }
+    if (R.vegetariano && /gastr/.test(norm(r.categoria)) && r.vegetariano==="no"){ bd.push(["No vegetariano", -6]); flags.push("sin opción vegetariana"); }
+    if (R.sinAltura && /altura|montana/.test(text)){ bd.push(["Altura", -4]); flags.push("altura"); }
+    if (R.sinNoche && r.franja==="noche" && !/gastr/.test(norm(r.categoria))){ bd.push(["Nocturna", -1.5]); }
+    if (R.ninos && /adrenalina|puenting|vida nocturna/.test(text)){ bd.push(["No apto niños", -3]); flags.push("no apto para niños"); }
+    // 6) Palabras de las restricciones/comentarios presentes en el registro
+    const tHits = qTokens.filter(w=>text.includes(w));
+    if (tHits.length) bd.push(["Coincidencia texto", Math.min(1.5, tHits.length*0.5)]);
+    // 7) Retroalimentación del usuario
+    if (F.cheaper) bd.push(["Feedback: económico", -+(r.costo/40).toFixed(1)]);
+    if (F.relax && /relax/.test(norm(r.categoria))) bd.push(["Feedback: relax", 2]);
+    if (F.relax && /aventura/.test(norm(r.categoria))) bd.push(["Feedback: relax", -1]);
+    for (const k of Object.keys(F.boost)) if (norm(r.categoria).includes(norm(k).split(" ")[0])) bd.push(["Feedback: "+k, 2]);
+    const score = +bd.reduce((a,[,v])=>a+v,0).toFixed(1);
+    return {r, score, bd, excl, flags};
+  });
+  const pool = scored.filter(s=>!s.excl).sort((a,b)=>b.score-a.score);
+  const k = clamp(p.dias*4, 6, 18);
+  const top = pool.slice(0, k);
+  const chunks = top.flatMap(s => toChunks(s.r));
+  const context = chunks.map(c=>c.text).join("\n\n");
+  return {k, total:S.data.length, candidates:pool.length, top, scored:pool, chunks, context, anyDest, R, F, tokens: Math.round(context.length/4)};
+}
+function toChunks(r){
+  // Divide descripciones largas en fragmentos (~220 caracteres) que heredan los metadatos.
+  const head = `[#${r.id}] ${r.nombre} | ${r.categoria} | ${r.destino}${r.pais?", "+r.pais:""}`;
+  const meta = `Costo aprox.: $${r.costo} USD/persona · Nivel: ${NIVELES[r.nivel]?.label||r.nivel} · Franja: ${r.franja} · Duración: ${r.duracion} h · Accesible: ${r.accesible} · Vegetariano: ${r.vegetariano} · Rating: ${r.rating}`;
+  const sents = (r.descripcion||"").match(/[^.!?]+[.!?]?/g) || [""];
+  const parts = []; let cur = "";
+  for (const s of sents){ if ((cur+s).length > 220 && cur){ parts.push(cur.trim()); cur = s; } else cur += s; }
+  parts.push(cur.trim());
+  return parts.map((d,i)=>({id:r.id, part:i+1, of:parts.length, text:`${head}${parts.length>1?` (parte ${i+1}/${parts.length})`:""}\n${d}\n${meta}`}));
+}
+function renderRag(){
+  const x = S.retrieval; if (!x) return;
+  $("#nRag").textContent = x.top.length;
+  const warn = !x.anyDest ? `<div class="errbox"><b>El destino no existe en la base cargada.</b> No hay contexto que recuperar: un LLM real tendría que responder solo con su conocimiento general (mayor riesgo de alucinación). El filtro de grounding lo reflejará.</div>` : "";
+  const rows = x.scored.slice(0, 40).map((s,i)=>`
+    <tr style="${i<x.k?"":"opacity:.55"}">
+      <td>${i<x.k?'<span class="tag g">top-'+(i+1)+'</span>':'<span class="tag">descartado</span>'}</td>
+      <td><b>#${esc(s.r.id)} ${esc(s.r.nombre)}</b><br><small>${esc(s.r.categoria)} · ${esc(s.r.franja)} · ${money(s.r.costo)}</small>${s.flags.map(f=>` <span class="tag r">${esc(f)}</span>`).join("")}</td>
+      <td><b>${s.score}</b></td>
+      <td><div class="bd">${s.bd.filter(([,v])=>v!==0).map(([k,v])=>`<span class="tag ${v>0?"g":"r"}">${esc(k)} ${v>0?"+":""}${v}</span>`).join("")}</div></td>
+    </tr>`).join("");
+  $("#ragOut").innerHTML = `${warn}
+    <div class="stats">
+      <div class="stat"><b>${x.total}</b><span>registros en memoria</span></div>
+      <div class="stat"><b>${x.candidates}</b><span>candidatos tras filtrar destino</span></div>
+      <div class="stat"><b>${x.top.length}</b><span>recuperados (top-k = ${x.k})</span></div>
+      <div class="stat"><b>~${x.tokens}</b><span>tokens de contexto (estimado)</span></div>
+    </div>
+    <h3>① Registros puntuados <small class="muted">(desglose de la búsqueda heurística)</small></h3>
+    <div class="tscroll"><table class="t"><tr><th>Estado</th><th>Registro</th><th>Puntaje</th><th>Desglose</th></tr>${rows || '<tr><td colspan="4">Sin candidatos.</td></tr>'}</table></div>
+    <h3 style="margin-top:18px">② Fragmentos (chunks) seleccionados</h3>
+    <div class="chunks">${x.chunks.map(c=>`<div class="chunk"><div class="h"><span>Chunk #${esc(c.id)}${c.of>1?` · ${c.part}/${c.of}`:""}</span><span class="tag b">${c.text.length} car.</span></div><pre>${esc(c.text)}</pre></div>`).join("") || '<div class="empty">Sin fragmentos.</div>'}</div>
+    <h3 style="margin-top:18px">③ Contexto final que recibe el LLM</h3>
+    <pre class="code"><span class="s-ctx">${esc(x.context || "(vacío)")}</span></pre>`;
+}
+
+
+const SCHEMA_TXT = `{
+  "resumen": "string",
+  "razonamiento": ["paso 1 ...", "paso 2 ..."],
+  "dias": [{
+    "dia": 1, "titulo": "string",
+    "manana": {"actividad": "string", "detalle": "string", "costo": 0, "ref": "#id | externo"},
+    "tarde":  {"actividad": "string", "detalle": "string", "costo": 0, "ref": "#id | externo"},
+    "noche":  {"actividad": "string", "detalle": "string", "costo": 0, "ref": "#id | externo"},
+    "comidas_estimadas": 0, "costo_dia": 0,
+    "recomendaciones": "string"
+  }],
+  "presupuesto_total": 0,
+  "recomendaciones_generales": ["string"],
+  "observaciones": ["string"]
+}`;
+const FEW_SHOT = `EJEMPLO (few-shot)
+Entrada: destino=Lima · 1 día · presupuesto=Económico · intereses=[Gastronomía] · restricciones="vegetariano"
+Contexto: [#7] Mercado de Surquillo | Gastronomía | Lima ... Vegetariano: si
+Salida:
+{"resumen":"Un día gastronómico vegetariano y económico en Lima.",
+ "razonamiento":["Filtré el contexto: solo opciones aptas para vegetarianos.","Asigné el mercado en la mañana por su horario.","Sumé costos: $24 ≤ $60, cumple el nivel Económico."],
+ "dias":[{"dia":1,"titulo":"Sabores de Lima",
+   "manana":{"actividad":"Mercado de Surquillo","detalle":"Frutas y jugos peruanos.","costo":6,"ref":"#7"},
+   "tarde":{"actividad":"Paseo por el Malecón","detalle":"Caminata gratuita junto al mar.","costo":0,"ref":"externo"},
+   "noche":{"actividad":"Cena vegetariana ligera","detalle":"Cerca del alojamiento.","costo":0,"ref":"externo"},
+   "comidas_estimadas":18,"costo_dia":24,"recomendaciones":"Pide platos sin carne con anticipación."}],
+ "presupuesto_total":24,"recomendaciones_generales":["Lleva efectivo para mercados."],"observaciones":["Precios aproximados."]}`;
+
+function buildPrompt(p, x){
+  const N = NIVELES[p.presupuesto];
+  const vars = {
+    destino: p.destino, duracion: p.dias + " días", viajeros: p.viajeros,
+    presupuesto: `${N.label} (≤ $${N.max} por persona/día)`,
+    intereses: p.intereses.length ? p.intereses.join(", ") : "sin preferencia",
+    restricciones: p.restricciones || "ninguna",
+    top_k: x.k, registros_contexto: x.top.length,
+    retroalimentacion: S.feedback.length ? S.feedback.length+" comentario(s)" : "ninguna",
+    proveedor: PROVIDERS[S.provider].name, modelo: S.models[S.provider], temperatura: S.temp
+  };
+  const system = `Eres "ViajeIA", un experto en planificación turística con amplia experiencia en Latinoamérica. Diseñas itinerarios realistas, seguros, inclusivos y ajustados al presupuesto.
+REGLAS:
+1. Usa PRIORITARIAMENTE las actividades del CONTEXTO RECUPERADO y cita su id en "ref" (p. ej. "#12"). Si propones algo que no está en el contexto, usa "ref":"externo" y que sea una sugerencia general y segura (no inventes nombres de negocios).
+2. Respeta SIEMPRE las restricciones del viajero; si una actividad las incumple, no la incluyas.
+3. El gasto diario por persona (actividades + comidas_estimadas) no debe superar el tope del nivel de presupuesto.
+4. Cada día tiene mañana, tarde y noche. Si una actividad dura todo el día, indícalo en la tarde como continuación con costo 0.
+5. Prioriza los intereses seleccionados, evita repetir actividades y agrupa lugares cercanos.
+6. Usa un lenguaje respetuoso, sin estereotipos sobre personas o lugares.
+7. Responde ÚNICAMENTE con JSON válido en español, siguiendo el esquema indicado.`;
+  const fb = S.feedback.map((f,i)=>`- Versión ${f.version} valorada como "${f.rating==="util"?"Útil":"Requiere ajustes"}": ${f.text || "(sin comentario)"}${f.failures?.length?`\n  Fallos detectados por los filtros: ${f.failures.join("; ")}`:""}`).join("\n");
+  const sections = [
+    ["s-shot", FEW_SHOT],
+    ["s-ctx", `### CONTEXTO RECUPERADO (RAG · ${x.top.length} registros de ${esc(S.source)})\n${x.context || "(No hay registros para este destino. Usa conocimiento general, marca todo como 'externo' y advierte al usuario.)"}`],
+    ["s-pref", `### PREFERENCIAS DEL VIAJERO\n- Destino: {{destino}}\n- Duración: {{duracion}}\n- Viajeros: {{viajeros}}\n- Presupuesto: {{presupuesto}}\n- Intereses: {{intereses}}\n- Restricciones: {{restricciones}}`],
+    ...(fb ? [["s-fb", `### RETROALIMENTACIÓN DE VERSIONES ANTERIORES (aplícala obligatoriamente)\n${fb}`]] : []),
+    ["s-cot", `### RAZONAMIENTO (Chain-of-Thought)\nPiensa paso a paso antes de responder:\n1) Descarta del contexto lo que incumpla restricciones.\n2) Ordena por afinidad con los intereses.\n3) Asigna actividades a mañana/tarde/noche según su franja y duración.\n4) Suma costos por día y verifica el tope del presupuesto.\n5) Revisa que no haya repeticiones.\nResume ese razonamiento en 3–6 frases dentro de "razonamiento".`],
+    ["s-fmt", `### FORMATO DE SALIDA (JSON)\n${SCHEMA_TXT}`]
+  ];
+  const fill = t => t.replace(/\{\{(\w+)\}\}/g, (_,k)=>String(vars[k] ?? ""));
+  const user = sections.map(([,t])=>fill(t)).join("\n\n");
+  return {system, user, vars, sections, fill};
+}
+function renderPrompt(){
+  const P = S.prompt; if (!P) return;
+  const hl = t => esc(t).replace(/\{\{(\w+)\}\}/g, (_,k)=>`<span class="var">${esc(P.vars[k])}</span>`);
+  const body = P.sections.map(([c,t])=>`<span class="${c}">${hl(t)}</span>`).join("\n\n");
+  $("#promptOut").innerHTML = `
+    <div class="legend">
+      <span><i style="background:#5eead4"></i>Sistema (rol + reglas)</span><span><i style="background:#f9a8d4"></i>Few-shot</span><span><i style="background:#7dd3fc"></i>Contexto RAG (grounding)</span>
+      <span><i style="background:#fcd34d"></i>Preferencias</span><span><i style="background:#fca5a5"></i>Retroalimentación</span><span><i style="background:#c4b5fd"></i>Chain-of-Thought</span><span><i style="background:#a7f3d0"></i>Formato</span>
+    </div>
+    <div class="grid" style="grid-template-columns:minmax(260px,330px) 1fr">
+      <div>
+        <h3>Variables inyectadas</h3>
+        <div class="tscroll" style="max-height:none"><table class="t">${Object.entries(P.vars).map(([k,v])=>`<tr><td><code>{{${esc(k)}}}</code></td><td>${esc(v)}</td></tr>`).join("")}</table></div>
+        <div class="note"><b>Técnicas aplicadas:</b> rol de sistema · reglas explícitas · few-shot (1 ejemplo) · grounding con <code>ref</code> · Chain-of-Thought guiado y resumido · salida JSON estructurada · retroalimentación iterativa.</div>
+        <p class="hint">Longitud total ≈ ${Math.round((P.system.length+P.user.length)/4)} tokens.</p>
+      </div>
+      <div>
+        <h3>Mensaje de sistema</h3>
+        <pre class="code"><span class="s-sys">${esc(P.system)}</span></pre>
+        <h3 style="margin-top:14px">Mensaje de usuario (prompt dinámico)</h3>
+        <pre class="code">${body}</pre>
+      </div>
+    </div>`;
+}
+
+
+function extractJSON(txt){
+  let t = String(txt).replace(/```(?:json)?/gi,"").trim();
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a<0 || b<0) throw new Error("La respuesta no contiene JSON.");
+  t = t.slice(a, b+1);
+  try { return JSON.parse(t); }
+  catch { return JSON.parse(t.replace(/,\s*([}\]])/g,"$1")); } // reparación: comas finales
+}
+
+/* ======================================================================
+   SIMULADOR (Mock LLM): genera una respuesta con el mismo contrato JSON
+   ====================================================================== */
+function simulateLLM(p, x){
+  const R = x.R, F = x.F, N = NIVELES[p.presupuesto];
+  const ok = s => !s.flags.length;                       // el "modelo" respeta restricciones
+  let cand = x.top.filter(ok).map(s=>s.r);
+  if (F.cheaper) cand.sort((a,b)=>a.costo-b.costo);
+  const used = new Set(), G = MOCK_DATA.actividades_genericas;
+  const pick = (fr, maxH, maxC=Infinity) => {
+    let r = cand.find(c=>!used.has(c.id) && c.franja===fr && c.duracion<=maxH && c.costo<=maxC);
+    if (!r && fr!=="noche") r = cand.find(c=>!used.has(c.id) && c.franja!=="noche" && c.duracion<=maxH && c.costo<=maxC);
+    if (r) used.add(r.id); return r;
+  };
+  const slot = (r, fr, i) => r ? {actividad:r.nombre, detalle:r.descripcion, costo:r.costo, ref:"#"+r.id}
+    : {actividad:G[fr][i % G[fr].length], detalle:"Sugerencia general (no proviene de la base de datos).", costo:0, ref:"externo"};
+  const dias = [];
+  for (let d=1; d<=p.dias; d++){
+    const comidas = Math.round(N.comidas * (F.cheaper ? 0.8 : 1));
+    let rem = N.max - comidas;                              // el "modelo" respeta el tope diario
+    const m = pick("mañana", 12, rem); rem -= m ? m.costo : 0;
+    let t, n;
+    if (m && m.duracion >= 7) t = {actividad:"Continuación: "+m.nombre, detalle:"Actividad de jornada completa; incluye traslado de regreso.", costo:0, ref:"#"+m.id};
+    else t = (F.relax && d%2===0) ? {actividad:"Tarde libre para descansar", detalle:"Espacio libre solicitado en la retroalimentación.", costo:0, ref:"externo"} : slot(pick("tarde", 6, rem), "tarde", d);
+    rem -= t.costo || 0;
+    n = R.sinNoche ? {actividad:"Descanso en el alojamiento", detalle:"Sin actividades nocturnas, según tus restricciones.", costo:0, ref:"externo"} : slot(pick("noche", 4, rem), "noche", d);
+    const mm = slot(m, "mañana", d);
+    const costo_dia = mm.costo + (t.costo||0) + (n.costo||0) + comidas;
+    const refs = [m].filter(Boolean).concat(cand.filter(c=>("#"+c.id)===t.ref || ("#"+c.id)===n.ref));
+    const tags = norm(refs.map(r=>r.etiquetas.join(" ")+" "+r.categoria).join(" "));
+    const rec = [];
+    if (/altura|montana/.test(tags)) rec.push("Hidrátate y sube despacio por la altitud.");
+    if (/playa|snorkel|nado|termas/.test(tags)) rec.push("Lleva bloqueador, traje de baño y toalla.");
+    if (/senderismo|caminata|sendero/.test(tags)) rec.push("Usa calzado cómodo y lleva abrigo ligero.");
+    if (n.ref!=="externo") rec.push("Por la noche, usa transporte autorizado.");
+    if (R.vegetariano) rec.push("Confirma opciones vegetarianas al reservar.");
+    if (R.movilidad) rec.push("Verifica rampas y accesos antes de ir.");
+    if (!rec.length) rec.push("Reserva con anticipación en temporada alta.");
+    const tema = m ? m.categoria : (p.intereses[0] || "Exploración");
+    dias.push({dia:d, titulo:`${tema} en ${p.destino}`, manana:mm, tarde:t, noche:n, comidas_estimadas:comidas, costo_dia, recomendaciones:rec.slice(0,2).join(" ")});
+  }
+  const total = dias.reduce((a,b)=>a+b.costo_dia,0);
+  const discarded = x.top.filter(s=>!ok(s));
+  return {
+    resumen: `Itinerario de ${p.dias} día(s) en ${p.destino} con presupuesto ${N.label.toLowerCase()}${p.intereses.length?`, enfocado en ${p.intereses.join(", ").toLowerCase()}`:""}.`,
+    razonamiento: [
+      `Partí de ${x.top.length} registros recuperados por el RAG para ${p.destino}.`,
+      discarded.length ? `Descarté ${discarded.length} por incumplir restricciones (${[...new Set(discarded.flatMap(s=>s.flags))].join(", ")}).` : "Ningún registro recuperado incumplía las restricciones.",
+      p.intereses.length ? `Prioricé actividades de ${p.intereses.join(", ")} gracias a su mayor puntaje.` : "Sin intereses marcados, equilibré categorías según el rating.",
+      `Asigné cada actividad a su franja recomendada; las de jornada completa ocupan mañana y tarde.`,
+      `Sumé actividades + comidas: promedio ${money(total/p.dias)} por persona/día frente al tope de ${money(N.max)}.`,
+      ...(S.feedback.length ? [`Apliqué la retroalimentación: “${S.feedback.at(-1).text || S.feedback.at(-1).rating}”.`] : [])
+    ],
+    dias,
+    presupuesto_total: total,
+    recomendaciones_generales: [
+      "Confirma horarios y precios con antelación: los datos son referenciales.",
+      `Para ${p.viajeros} viajero(s), el total estimado del grupo es ${money(total*p.viajeros)}.`,
+      p.intereses.includes("Gastronomía") ? "Prueba al menos un mercado local: es la forma más económica de comer bien." : "Deja margen de tiempo entre actividades para traslados.",
+    ],
+    observaciones: [
+      "Generado en MODO SIMULADO: un algoritmo local imita la respuesta del LLM usando el mismo contexto RAG.",
+      x.anyDest ? "Todas las actividades citadas provienen del archivo cargado (grounding)." : "El destino no está en la base: el itinerario es genérico."
+    ]
+  };
+}
+
+/* ======================================================================
+   NORMALIZACIÓN + FILTROS DE COHERENCIA
+   ====================================================================== */
+const SLOTS = [["manana","Mañana"],["tarde","Tarde"],["noche","Noche"]];
+function normalizeIt(o){
+  const it = {...o}; it.dias = Array.isArray(o.dias) ? o.dias : [];
+  it.dias = it.dias.map((d,i)=>{
+    const z = {...d, dia: d.dia || i+1};
+    for (const [k] of SLOTS){ const s = d[k] || d[k==="manana"?"mañana":k] || {}; z[k] = {actividad:String(s.actividad||"").trim(), detalle:String(s.detalle||"").trim(), costo:num(s.costo), ref:String(s.ref||"externo").trim()}; }
+    z.comidas_estimadas = num(d.comidas_estimadas);
+    z.costo_calc = SLOTS.reduce((a,[k])=>a+z[k].costo,0) + z.comidas_estimadas;
+    z.costo_dia = num(d.costo_dia) || z.costo_calc;
+    return z;
+  });
+  it.total_declarado = num(o.presupuesto_total);
+  it.total_calc = it.dias.reduce((a,d)=>a+d.costo_calc,0);
+  for (const k of ["razonamiento","recomendaciones_generales","observaciones"]) it[k] = Array.isArray(o[k]) ? o[k] : (o[k] ? [String(o[k])] : []);
+  return it;
+}
+function runChecks(it, p, x){
+  const byId = Object.fromEntries(S.data.map(r=>["#"+r.id, r]));
+  const ctxIds = new Set(x.top.map(s=>"#"+s.r.id));
+  const R = x.R, N = NIVELES[p.presupuesto], C = [];
+  const acts = it.dias.flatMap(d=>SLOTS.map(([k,l])=>({d:d.dia, k, l, s:d[k]})));
+  const real = acts.filter(a=>!/^continuaci/i.test(a.s.actividad) && !/descans|libre/i.test(a.s.actividad));
+  const bad = new Set();
+  const add = (name, status, detail) => C.push({name, status, detail});
+
+  // 1. Estructura
+  add("Estructura y número de días", it.dias.length===p.dias ? "ok" : "fail", `${it.dias.length} día(s) generados de ${p.dias} solicitados.`);
+  // 2. Franjas completas
+  const empty = acts.filter(a=>!a.s.actividad);
+  add("Mañana, tarde y noche completas", empty.length ? "fail" : "ok", empty.length ? `Vacías: ${empty.map(a=>`día ${a.d} ${a.l}`).join(", ")}.` : "Las 3 franjas de cada día tienen actividad.");
+  // 3. Aritmética de costos
+  const diff = Math.abs(it.total_declarado - it.total_calc);
+  add("Consistencia aritmética del presupuesto", !it.total_declarado || diff <= Math.max(5, it.total_calc*0.05) ? "ok" : "warn",
+      it.total_declarado ? `Total declarado ${money(it.total_declarado)} · recalculado ${money(it.total_calc)}${diff>5?" (se usa el recalculado)":""}.` : `Total recalculado: ${money(it.total_calc)}.`);
+  // 4. Tope del nivel
+  const avg = it.total_calc / Math.max(1,it.dias.length);
+  const over = it.dias.filter(d=>d.costo_calc > N.max);
+  add(`Presupuesto ${N.label} (≤ ${money(N.max)}/día)`, avg <= N.max && !over.length ? "ok" : avg <= N.max*1.15 ? "warn" : "fail",
+      `Promedio ${money(avg)}/persona/día.${over.length?` Días que exceden: ${over.map(d=>d.dia).join(", ")}.`:""}`);
+  // 5. Restricciones
+  const viol = [];
+  for (const a of acts){
+    const r = byId[a.s.ref]; const t = norm(a.s.actividad+" "+a.s.detalle);
+    // Si la actividad cita un registro, se confía en su atributo; si no, se revisa el texto generado.
+    if (R.vegetariano && (r ? (/gastr/.test(norm(r.categoria)) && r.vegetariano==="no") : /hornado|encebollado|carne|chancho|cerdo|pollo|ceviche/.test(t))) viol.push([a,"no vegetariano"]);
+    if (R.movilidad && r && r.accesible==="no") viol.push([a,"no accesible"]);
+    if (R.sinAltura && ((r && /altura|montana/.test(norm(r.etiquetas.join(" ")))) || /pichincha|vinicunca|siete colores/.test(t))) viol.push([a,"actividad en altura"]);
+    if (R.sinNoche && a.k==="noche" && a.s.costo>0 && !(r && /gastr/.test(norm(r.categoria)))) viol.push([a,"actividad nocturna"]);
+    if (R.ninos && r && /puenting|vida nocturna|adrenalina/.test(norm(r.etiquetas.join(" ")))) viol.push([a,"no apto para niños"]);
+  }
+  viol.forEach(([a])=>bad.add(a.d+a.k));
+  const anyR = Object.values(R).some(Boolean);
+  add("Cumplimiento de restricciones", !anyR ? "ok" : viol.length ? "fail" : "ok",
+      !anyR ? "No se declararon restricciones." : viol.length ? viol.map(([a,w])=>`Día ${a.d} ${a.l}: “${a.s.actividad}” (${w})`).join("; ") : "Ninguna actividad incumple las restricciones declaradas.");
+  // 6. Coherencia con intereses
+  if (p.intereses.length){
+    const withRef = real.map(a=>byId[a.s.ref]).filter(Boolean);
+    const hit = withRef.filter(r=>p.intereses.some(i=>norm(r.categoria).includes(norm(i).split(" ")[0])));
+    const pct = withRef.length ? Math.round(hit.length/withRef.length*100) : 0;
+    add("Coherencia con los intereses", pct>=50?"ok":pct>=30?"warn":"fail", `${pct}% de las actividades con fuente pertenecen a: ${p.intereses.join(", ")}.`);
+  } else add("Coherencia con los intereses", "ok", "Sin intereses seleccionados: se acepta cualquier categoría.");
+  // 7. Grounding
+  const grounded = real.filter(a=>ctxIds.has(a.s.ref));
+  const unknown = real.filter(a=>a.s.ref!=="externo" && !byId[a.s.ref]);
+  const gp = real.length ? Math.round(grounded.length/real.length*100) : 0;
+  add("Grounding (actividades respaldadas por el RAG)", gp>=70 && !unknown.length ? "ok" : gp>=40 ? "warn" : "fail",
+      `${gp}% de las actividades citan un registro recuperado.${unknown.length?` Referencias inexistentes (posible alucinación): ${unknown.map(a=>a.s.ref).join(", ")}.`:""}`);
+  unknown.forEach(a=>bad.add(a.d+a.k));
+  // 8. Duplicados
+  const seen = {}, dups = [];
+  for (const a of real){ const key = a.s.ref!=="externo" ? a.s.ref : norm(a.s.actividad); if (seen[key]) dups.push(a.s.actividad); seen[key]=1; }
+  add("Sin actividades repetidas", dups.length ? "warn" : "ok", dups.length ? `Repetidas: ${[...new Set(dups)].join(", ")}.` : "Cada actividad aparece una sola vez.");
+  // 9. Lenguaje / sesgo
+  const all = norm(JSON.stringify(it));
+  const biasRx = /(no es (un lugar )?para (mujeres|ancianos|personas mayores)|esa gente|gente de ahi|tipico de (esa|esta) gente|peligroso para (mujeres|extranjeros))/;
+  add("Lenguaje respetuoso y sin estereotipos", biasRx.test(all) ? "fail" : "ok", biasRx.test(all) ? "Se detectaron expresiones estereotipadas." : "No se detectaron expresiones del léxico de sesgo (revisión básica).");
+
+  const score = Math.round(C.reduce((a,c)=>a+(c.status==="ok"?1:c.status==="warn"?0.5:0),0)/C.length*100);
+  return {checks:C, score, bad};
+}
+
+
+
+/* ======================================================================
+   RENDER DEL ITINERARIO
+   ====================================================================== */
+const WHEN = {manana:["Mañana","i-sun"], tarde:["Tarde","i-dusk"], noche:["Noche","i-moon"]};
+function stepsHTML(done){
+  const st = [["Preferencias"],["Datos"],["Recuperación","rag"],["Prompt","prompt"],["Generación"],["Validación","#quality"],["Retroalimentación","#feedback"]];
+  return `<ol class="steps" aria-label="Cómo se construyó este plan">${st.slice(0,done).map(([t,v])=> v ? (v.startsWith("#")?`<li><a href="${v}">${t}</a></li>`:`<li><a href="#" data-goto="${v}">${t}</a></li>`) : `<li><span>${t}</span></li>`).join("")}</ol>`;
+}
+function renderLoading(mode){
+  const p = getPrefs();
+  $("#results").hidden = false;
+  $("#results").innerHTML = `<div class="res"><div>
+    <div class="loading-note"><div class="spin"></div>${mode==="api"?`Consultando a ${esc(P().name)} (${esc(S.models[S.provider])})…`:"El simulador está armando tu plan…"}</div>
+    <div class="skel" style="height:40px;width:60%;margin-bottom:14px"></div>
+    ${Array.from({length:Math.min(p.dias,2)}).map(()=>`<div class="day"><div class="skel" style="height:190px;border-radius:0"></div><div style="padding:18px 22px">${[1,2,3].map(()=>`<div style="display:grid;grid-template-columns:78px 92px 1fr;gap:16px;margin-bottom:16px"><div class="skel" style="height:22px"></div><div class="skel" style="height:92px"></div><div><div class="skel" style="height:18px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:14px"></div></div></div>`).join("")}</div></div>`).join("")}
+  </div><div class="rail"><div class="panel"><div class="skel" style="height:120px"></div></div><div class="panel"><div class="skel" style="height:160px"></div></div></div></div>`;
+  $("#results").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function renderIt(){
+  const v = S.versions[S.cur]; if (!v) return;
+  const {it, checks, prefs:p, mode} = v; const N = NIVELES[p.presupuesto];
+  const byId = Object.fromEntries(S.data.map(r=>["#"+r.id, r]));
+  const avg = it.total_calc/Math.max(1,it.dias.length), pct = clamp(avg/N.max*100,0,100);
+  const maxDay = Math.max(...it.dias.map(d=>d.costo_calc), 1);
+  const slotHTML = (d,k) => {
+    const s = d[k], r = byId[s.ref], bad = checks.bad.has(d.dia+k);
+    const src = r?.imagen || "";
+    const img = r ? imgSlot(`${r.nombre} ${r.destino}`, r.categoria, {src}) : imgSlot("", s.actividad.match(/cena|comida|mercado/i)?"Gastronomía":(k==="noche"?"Relax":"Aire libre"));
+    return `<li class="slot ${bad?"bad":""}">
+      <div class="when"><svg aria-hidden="true"><use href="#${WHEN[k][1]}"/></svg>${WHEN[k][0]}</div>
+      <div class="thumb">${img}</div>
+      <div class="what"><h4>${esc(s.actividad||"Sin actividad")}</h4><p>${esc(s.detalle)}</p>
+        <div class="tags">${r?`<span class="tag b" title="Tomado del registro ${esc(s.ref)} de tu archivo">Fuente ${esc(s.ref)}</span>`:`<span class="tag" title="No proviene de la base de conocimiento">Sugerencia general</span>`}<span class="tag">${s.costo?money(s.costo):"Gratis"}</span>${r?`<span class="tag">${esc(r.categoria)}</span>`:""}${bad?'<span class="tag r">Revisar</span>':""}</div>
+      </div></li>`;
+  };
+  const coverRef = byId[it.dias[0]?.manana?.ref];
+  const fails = checks.checks.filter(c=>c.status==="fail").length, warns = checks.checks.filter(c=>c.status==="warn").length;
+  const col = checks.score>=85?"var(--ok)":checks.score>=60?"var(--maize-600)":"var(--fail)";
+  $("#results").innerHTML = `<div class="res">
+   <div>
+    <div class="trip-h"><div>
+      <h2>${p.dias} ${p.dias===1?"día":"días"} en ${esc(p.destino)}</h2>
+      <div class="tags"><span class="tag ${mode==="api"?"b":"v"}">${mode==="api"?esc(v.provName+" · "+v.model):"Modo simulado"}</span><span class="tag">${N.label}</span>${p.intereses.map(i=>`<span class="tag">${INTERESES[i].icon} ${esc(i)}</span>`).join("")}<span class="tag">Versión ${v.n}</span></div>
+    </div></div>
+    ${stepsHTML(S.feedback.length?7:6)}
+    <p class="summary-txt">${esc(it.resumen||"")}</p>
+    ${it.razonamiento.length?`<details class="why"><summary>Por qué el modelo armó este plan</summary><ol>${it.razonamiento.map(r=>`<li>${esc(r)}</li>`).join("")}</ol></details>`:""}
+    <nav class="daynav" aria-label="Días">${it.dias.map(d=>`<a href="#day-${d.dia}">Día ${d.dia}</a>`).join("")}</nav>
+    ${it.dias.map(d=>{
+      const cr = byId[d.manana.ref] || byId[d.tarde.ref] || byId[d.noche.ref];
+      return `<article class="day" id="day-${d.dia}">
+        <div class="day-cover">${cr ? imgSlot(`${cr.nombre} ${cr.destino}`, cr.categoria, {src:cr.imagen, ai:`${cr.nombre}, ${cr.destino}, travel photography`}) : imgSlot(p.destino, p.intereses[0]||"", {exact:1, ai:`${p.destino} travel photography`})}
+          <div class="day-cap"><div><span class="d">Día ${d.dia}</span><h3>${esc(d.titulo||"")}</h3></div><div class="c">${money(d.costo_calc)}<small>por persona</small></div></div></div>
+        <ol class="tl">${["manana","tarde","noche"].map(k=>slotHTML(d,k)).join("")}</ol>
+        <p class="tip"><svg width="18" height="18" aria-hidden="true"><use href="#i-bulb"/></svg><span>${esc(d.recomendaciones||"")} <small>Incluye ${money(d.comidas_estimadas)} estimados en comidas.</small></span></p>
+      </article>`;}).join("")}
+    <div class="wrapup">
+      <section><h3>Recomendaciones generales</h3><ul>${it.recomendaciones_generales.map(r=>`<li>${esc(r)}</li>`).join("")||"<li>Sin recomendaciones.</li>"}</ul></section>
+      <section><h3>Observaciones finales</h3><ul>${it.observaciones.map(r=>`<li>${esc(r)}</li>`).join("")||"<li>Sin observaciones.</li>"}</ul></section>
+    </div>
+   </div>
+   <aside class="rail">
+    <div class="panel">
+      <h3>Presupuesto estimado</h3>
+      <div class="big">${money(it.total_calc)}</div>
+      <p class="muted" style="margin:6px 0 0">por persona, ${money(it.total_calc*p.viajeros)} para ${p.viajeros} ${p.viajeros===1?"viajero":"viajeros"}</p>
+      <div class="meter" role="meter" aria-valuenow="${Math.round(avg)}" aria-valuemin="0" aria-valuemax="${N.max}" aria-label="Gasto diario frente al tope"><i style="width:${pct}%;background:${avg>N.max?"var(--fail)":"var(--indigo)"}"></i></div>
+      <small>${money(avg)} al día de un tope de ${money(N.max)} (${N.label.toLowerCase()})</small>
+      <div class="bars">${it.dias.map(d=>`<div><span>Día ${d.dia}</span><span><i style="width:${d.costo_calc/maxDay*100}%"></i></span><span>${money(d.costo_calc)}</span></div>`).join("")}</div>
+    </div>
+    <div class="panel" id="quality">
+      <h3>Control de calidad</h3>
+      <div class="score"><div class="ring" style="--p:${checks.score};--c:${col}"><b>${checks.score}%</b></div>
+        <div><b>${fails?`${fails} ${fails===1?"fallo":"fallos"} por corregir`:warns?`${warns} ${warns===1?"advertencia":"advertencias"}`:"Todo en orden"}</b><br><small>${checks.checks.length} verificaciones automáticas de coherencia</small></div></div>
+      <details ${fails||warns?"open":""}><summary class="hint" style="cursor:pointer;margin-top:10px">Ver detalle de las verificaciones</summary>
+        <div class="checks">${checks.checks.map(c=>`<div class="chk ${c.status}"><span class="ic" aria-hidden="true">${c.status==="ok"?"✓":c.status==="warn"?"!":"✕"}</span><div><b>${esc(c.name)}</b><span class="sr">: ${c.status==="ok"?"cumple":c.status==="warn"?"advertencia":"falla"}</span><p>${esc(c.detail)}</p></div></div>`).join("")}</div>
+      </details>
+    </div>
+    <div class="panel fbp" id="feedback">
+      <h3>¿Te sirve este plan?</h3>
+      <div class="seg2"><button class="u" data-r="util" aria-pressed="${S.fbRating==="util"}">👍 Útil</button><button class="a" data-r="ajustes" aria-pressed="${S.fbRating==="ajustes"}">🛠️ Requiere ajustes</button></div>
+      <label class="sr" for="fbText">Comentarios</label>
+      <textarea class="ta" id="fbText" placeholder="Cuéntanos qué cambiar: más económico, más gastronomía, una tarde libre…"></textarea>
+      <div class="quick">${QUICK_F.map(q=>`<button type="button" data-q="${esc(q)}">+ ${esc(q)}</button>`).join("")}</div>
+      <label class="check"><input type="checkbox" id="fbFilters" checked> <span>Enviar también los problemas que detectó el control de calidad</span></label>
+      <button class="btn ind" id="btnRegen" style="width:100%">Regenerar con Ajustes</button>
+      <div class="btns" style="margin-top:10px"><button class="btn sm" id="btnJson">Exportar JSON</button><button class="btn sm" id="btnPrint">Imprimir o guardar PDF</button></div>
+      <div class="versions" aria-label="Versiones">${S.versions.map((x,i)=>`<button data-i="${i}" ${i===S.cur?'aria-current="true"':""}>v${x.n}, ${x.mode==="api"?"IA":"simulado"}, ${x.checks.score}%</button>`).join("")}</div>
+    </div>
+   </aside></div>`;
+  hydrateImages($("#results"));
+  $$("#results [data-goto]").forEach(a=>a.onclick=e=>{e.preventDefault(); showView(a.dataset.goto);});
+  $$(".seg2 button").forEach(b=>b.onclick=()=>{ S.fbRating=b.dataset.r; $$(".seg2 button").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+  $$(".quick button").forEach(b=>b.onclick=()=>{ const t=$("#fbText"); t.value=(t.value?t.value.replace(/[.;\s]*$/,"")+"; ":"")+b.dataset.q.toLowerCase(); S.fbRating="ajustes"; $$(".seg2 button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.r==="ajustes")); });
+  $("#btnRegen").onclick = regenerate;
+  $("#btnJson").onclick = () => download(`itinerario_${norm(p.destino).replace(/\W+/g,"_")}_v${v.n}.json`, JSON.stringify({preferencias:p, modo:v.mode, proveedor:v.provName, modelo:v.model, itinerario:v.raw, calidad:{puntaje:checks.score, verificaciones:checks.checks}}, null, 2));
+  $("#btnPrint").onclick = () => window.print();
+  $$(".versions button").forEach(b=>b.onclick=()=>{ S.cur=+b.dataset.i; renderIt(); });
+}
+
+/* ======================================================================
+   ORQUESTADOR DEL PIPELINE
+   ====================================================================== */
+async function generate(mode){
+  const p = getPrefs();
+  if (!p.destino){ toast("Escribe un destino en la frase."); $("#dest").focus(); return; }
+  if (!S.data.length){ toast("Carga un archivo de destinos o usa los datos de ejemplo."); $("#kb").scrollIntoView({behavior:"smooth"}); return; }
+  if (mode==="api" && !hasKey()){ openDrawer(); return; }
+  S.lastMode = mode;
+  S.retrieval = retrieve(p); renderRag();
+  S.prompt = buildPrompt(p, S.retrieval); renderPrompt();
+  renderLoading(mode);
+  $$("#btnPrimary,#btnSecondary").forEach(b=>b.disabled=true);
+  let raw;
+  try {
+    if (mode === "api"){ const txt = await callLLM(S.prompt.system, S.prompt.user); raw = extractJSON(txt); refreshStatus(null); }
+    else { await new Promise(r=>setTimeout(r, 900)); raw = simulateLLM(p, S.retrieval); }
+  } catch(e){
+    $("#results").innerHTML = `<div class="errbox"><b>${esc(P().name)} no pudo generar el itinerario.</b> ${esc(e.message)}<br>Revisa la clave, el nombre del modelo o tu conexión. Mientras tanto puedes usar el simulador.</div><div class="btns"><button class="btn pri" id="errMock">Simular con Mock Data</button><button class="btn" id="errConn">Revisar conexión</button></div>`;
+    $("#errMock").onclick = () => generate("mock"); $("#errConn").onclick = openDrawer;
+    if (mode==="api") refreshStatus(e.message);
+    $$("#btnPrimary,#btnSecondary").forEach(b=>b.disabled=false);
+    return;
+  }
+  const it = normalizeIt(raw); const checks = runChecks(it, p, S.retrieval);
+  S.it = it; S.checks = checks;
+  S.versions.push({n:S.versions.length+1, it, checks, prefs:p, mode, model:S.models[S.provider], provName:P().short, raw, prompt:S.prompt});
+  S.cur = S.versions.length-1;
+  renderIt();
+  $$("#btnPrimary,#btnSecondary").forEach(b=>b.disabled=false);
+}
+function regenerate(){
+  const v = S.versions[S.cur]; if (!v) return;
+  const text = $("#fbText").value.trim();
+  const failures = $("#fbFilters").checked ? v.checks.checks.filter(c=>c.status!=="ok").map(c=>`${c.name}: ${c.detail}`) : [];
+  if (S.fbRating==="util" && !text && !failures.length){ toast("Gracias, marcaste el plan como útil. Escribe un comentario si quieres ajustarlo."); return; }
+  S.feedback.push({version:v.n, rating:S.fbRating, text, failures});
+  generate(hasKey() && S.lastMode==="api" ? "api" : "mock");
+}
+
+/* ======================================================================
+   NAVEGACIÓN ENTRE VISTAS
+   ====================================================================== */
+function showView(v){
+  $$(".tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.view===v));
+  $("#planView").hidden = v!=="plan"; $("#views").hidden = v==="plan";
+  $$("section.view").forEach(s=>s.classList.toggle("on", s.id==="v-"+v));
+  if ((v==="rag"||v==="prompt") && !S.retrieval){ const p=getPrefs(); if (p.destino && S.data.length){ S.retrieval=retrieve(p); renderRag(); S.prompt=buildPrompt(p,S.retrieval); renderPrompt(); } }
+  window.scrollTo({top:0});
+}
+
+const PHASES = [
+  {t:"Análisis del problema y requerimientos", w:"Semana 1",
+   o:"Comprender la necesidad de itinerarios personalizados y traducir el enunciado en requerimientos medibles.",
+   a:["Revisión del enunciado y de soluciones existentes (planificadores, agentes de viaje con IA).","Definición de perfiles de usuario y casos de uso (viajero económico, con movilidad reducida, familiar).","Requerimientos funcionales (RF1–RF7 por módulo) y no funcionales (un solo archivo, sin backend, responsive).","Criterios de aceptación y métricas de calidad."],
+   e:["Documento de requerimientos","Matriz de trazabilidad requerimiento → módulo → prueba"],
+   h:["Google Docs / Markdown","Miro o diagramas de casos de uso"]},
+  {t:"Diseño de la arquitectura de la solución", w:"Semana 1",
+   o:"Definir componentes, responsabilidades y flujo de datos de una aplicación 100% cliente.",
+   a:["Diseño en capas: presentación, datos, inteligencia y calidad.","Definición del contrato JSON del itinerario (esquema de salida).","Diseño de la integración con dos proveedores y del modo simulado intercambiable.","Análisis de riesgos: CORS, exposición de la API Key, alucinaciones."],
+   e:["Diagrama de arquitectura (arquitectura.pdf)","Esquema JSON del itinerario"],
+   h:["draw.io / Mermaid","JSON Schema"]},
+  {t:"Análisis y preparación de destinos_turisticos.csv", w:"Semana 2",
+   o:"Construir una base de conocimiento limpia, consistente y útil para la recuperación.",
+   a:["Definición de columnas (destino, categoría, costo, nivel, franja, accesibilidad, vegetariano, etiquetas, rating).","Recolección y redacción de registros por destino; normalización de categorías y niveles.","Limpieza: duplicados, valores vacíos, codificación UTF-8, separadores.","Análisis exploratorio: registros por destino y categoría, rangos de costo."],
+   e:["destinos_turisticos.csv validado","Diccionario de datos"],
+   h:["Excel / Google Sheets","PapaParse","Python + pandas (opcional para EDA)"]},
+  {t:"Diseño del flujo RAG", w:"Semana 2",
+   o:"Recuperar solo la información relevante para cada viajero y entregarla al LLM como contexto.",
+   a:["Diseño de la función de puntuación (destino, interés, presupuesto, rating, palabras clave, restricciones, feedback).","Selección de top-k proporcional a la duración (≈ 4 registros por día).","Estrategia de chunking con metadatos y estimación de tokens.","Visualización de la etapa de Retrieval para fines didácticos."],
+   e:["Especificación del algoritmo de recuperación","Pestaña “Proceso RAG”"],
+   h:["JavaScript Vanilla","(Futuro) embeddings + FAISS/Chroma"]},
+  {t:"Diseño del Prompt Engineering", w:"Semana 3",
+   o:"Guiar al LLM para producir itinerarios fieles al contexto, al presupuesto y a las restricciones.",
+   a:["Redacción del mensaje de sistema (rol + reglas).","Diseño del ejemplo few-shot y de las instrucciones Chain-of-Thought.","Plantilla con variables inyectadas y bloque de retroalimentación.","Pruebas A/B de variantes del prompt con casos fijos."],
+   e:["Plantilla de prompt versionada","Bitácora de experimentos de prompting"],
+   h:["Google AI Studio","Groq Playground","OpenRouter Chat"]},
+  {t:"Desarrollo del prototipo", w:"Semanas 3–4",
+   o:"Implementar los 7 módulos en un único index.html funcional sin instalación.",
+   a:["Maquetación responsive (HTML5 + CSS3).","Carga de CSV/XLSX, detección de esquema y recuperación.","Constructor de prompts, integración con Gemini y OpenAI, simulador.","Filtros de coherencia, retroalimentación, versiones y sección educativa."],
+   e:["index.html","recursos/mock-data.json"],
+   h:["VS Code","Chrome DevTools","PapaParse, SheetJS (CDN)"]},
+  {t:"Pruebas funcionales", w:"Semana 5",
+   o:"Verificar que cada módulo cumple su requerimiento en escenarios normales y de borde.",
+   a:["Casos: sin API Key, clave inválida, destino inexistente, CSV con columnas distintas, XLSX, 1 y 14 días.","Pruebas de restricciones (vegetariano, movilidad, sin noche, altura).","Pruebas de compatibilidad (Chrome, Edge, Firefox, móvil) y de apertura con file://.","Registro de defectos y corrección."],
+   e:["Plan y matriz de casos de prueba","Informe de defectos"],
+   h:["Checklist en hoja de cálculo","DevTools (modo responsive, consola, red)"]},
+  {t:"Validación de resultados", w:"Semana 5",
+   o:"Medir la calidad de los itinerarios y comparar configuraciones.",
+   a:["Comparar modo simulado vs Gemini vs GPT-4o-mini con los mismos perfiles.","Comparar con y sin RAG, y antes/después de la retroalimentación.","Métricas: puntaje de filtros, % grounding, cumplimiento de presupuesto y restricciones, evaluación humana (escala 1–5).","Análisis de errores y sesgos."],
+   e:["Tabla comparativa de resultados","Conclusiones y limitaciones (memoria_tecnica.pdf)"],
+   h:["Pestaña de filtros + exportación JSON","Hoja de cálculo para métricas"]},
+  {t:"Despliegue y demostración", w:"Semana 6",
+   o:"Entregar y presentar un prototipo ejecutable y documentado.",
+   a:["Empaquetado de la estructura del proyecto.","Guion de demostración: perfil base → RAG → prompt → generación → filtros → feedback → v2.","Publicación opcional en GitHub Pages / Netlify (sitio estático).","Presentación y defensa."],
+   e:["Proyecto comprimido (.zip)","Video o demo en vivo","Documentación final en PDF"],
+   h:["GitHub / GitHub Pages","Navegador web"]}
+];
+const COMPONENTS = [
+  ["Presentación","Interfaz de usuario","Frase-formulario sobre la foto del destino, panel de conexión, línea de tiempo por día con fotos de Wikipedia y columna de presupuesto, calidad y retroalimentación.","UI"],
+  ["Datos","Módulo de carga de datos","Drag & drop / selector; PapaParse (CSV) y SheetJS (XLSX); detección de esquema por sinónimos; normalización en memoria.","M3"],
+  ["Datos","Recuperación (RAG)","Filtro por destino, puntuación heurística explicable, top-k, chunking con metadatos y estimación de tokens.","M3"],
+  ["Inteligencia","Constructor dinámico de prompts","Sistema + reglas + few-shot + contexto + preferencias + feedback + CoT + esquema JSON, con variables visibles.","M4"],
+  ["Inteligencia","Integración con modelos de IA","Adaptadores para Gemini, Groq, OpenRouter y GPT-4o-mini en modo JSON (con reintento si el modelo no lo admite), timeout y manejo de errores; simulador local intercambiable.","M1"],
+  ["Inteligencia","Generador de itinerarios","Extrae y repara el JSON, recalcula costos y construye tarjetas por día con resumen, presupuesto y recomendaciones.","M5"],
+  ["Calidad","Validación y filtros de coherencia","9 verificaciones (estructura, franjas, aritmética, tope, restricciones, intereses, grounding, duplicados, lenguaje) y puntaje global.","QA"],
+  ["Calidad","Sistema de retroalimentación","Valoración, comentarios y fallos de filtros que se reinyectan al prompt y a la puntuación RAG; historial de versiones.","M6"]
+];
+const TECH = [
+  ["HTML5","Estructura semántica, formularios nativos, File API y drag & drop sin librerías; roles ARIA para accesibilidad.","No tiene lógica ni estado por sí solo.","Esqueleto de la app, frase-formulario y carga de archivos."],
+  ["CSS3","Variables como tokens de diseño, Grid y Flexbox para diseño responsive, animaciones con respeto a prefers-reduced-motion y estilos de impresión.","Sin componentes listos: exige un sistema de diseño propio y disciplina.","Interfaz, línea de tiempo por día, patrones textiles de respaldo y modo impresión."],
+  ["JavaScript Vanilla","Corre en cualquier navegador sin compilación ni instalación; fetch, async/await y una cola de imágenes con concurrencia limitada.","Sin reactividad ni tipado: el código debe organizarse a mano; no protege secretos.","Lógica RAG, prompts, conexión con proveedores, filtros, imágenes y estado."],
+  ["PapaParse (CDN)","Parser CSV robusto: comillas, saltos de línea, encabezados y detección de delimitador.","Depende del CDN (la app trae un lector de respaldo); no lee Excel.","Lectura de destinos_turisticos.csv."],
+  ["SheetJS (CDN, opcional)","Lee XLSX/XLS en el navegador y convierte la hoja a objetos.","Biblioteca pesada; solo se usa la primera hoja; requiere CDN.","Permitir trabajar directamente con Excel."],
+  ["Google Gemini (Flash y Flash-Lite)","Nivel gratuito en Google AI Studio sin tarjeta, contexto muy amplio y salida JSON nativa (responseMimeType). Modelos actuales de la familia 3.x Flash.","Límites por minuto y por día; en el nivel gratuito los datos pueden usarse para mejorar productos de Google; los identificadores cambian con cada versión.","Proveedor principal recomendado para el aula."],
+  ["Groq (GPT-OSS, Qwen)","API compatible con OpenAI, nivel gratuito y velocidad de inferencia muy alta con modelos abiertos como openai/gpt-oss-120b.","Catálogo reducido y cambiante; límites de tokens por minuto en el plan gratuito.","Generación rápida y comparación con modelos abiertos."],
+  ["OpenRouter (modelos gratuitos)","Una sola clave para cientos de modelos; el enrutador openrouter/free elige un modelo gratuito disponible; API compatible con OpenAI.","Los modelos gratuitos rotan sin aviso y tienen un tope diario de solicitudes.","Experimentar con varios modelos sin cambiar el código."],
+  ["OpenAI GPT-4o-mini","Buena relación calidad/precio, modo JSON fiable (response_format) y ecosistema maduro.","Requiere saldo; la clave expuesta en el navegador es riesgosa fuera de un prototipo.","Proveedor de referencia exigido por el enunciado."],
+  ["Wikipedia / Wikimedia (API)","Fotos reales de los lugares, sin clave y con CORS abierto; cada foto enlaza a su página para la atribución.","Algunos lugares no tienen foto o la búsqueda devuelve una imagen aproximada.","Portadas de destino, portadas de cada día y miniaturas de actividades."],
+  ["Pollinations (imágenes con IA)","Genera una imagen a partir de un texto con una simple URL, sin clave.","Acceso anónimo lento y con límite de frecuencia; son ilustraciones, no fotos reales.","Portadas alternativas del destino."]
+];
+function renderDocs(){
+  $("#phases").innerHTML = PHASES.map((f,i)=>`
+    <details class="ph" ${i===0?"open":""}><summary><span class="num">${i+1}</span>${esc(f.t)}<span class="wk">${f.w}</span></summary>
+      <div class="ph-body">
+        <div><h4>🎯 Objetivo</h4><p>${esc(f.o)}</p><h4>📦 Entregables</h4><ul>${f.e.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div><h4>🛠️ Actividades</h4><ul>${f.a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><h4 style="margin-top:8px">🧰 Herramientas</h4><p>${f.h.map(x=>`<span class="tag">${esc(x)}</span>`).join(" ")}</p></div>
+      </div></details>`).join("");
+  const layers = [...new Set(COMPONENTS.map(c=>c[0]))];
+  $("#archComps").innerHTML = layers.map(l=>`<div class="layer">Capa de ${l.toLowerCase()}</div><div class="arch">${COMPONENTS.filter(c=>c[0]===l).map(c=>`<div class="comp"><span class="k">${c[3]}</span><b>${esc(c[1])}</b>${esc(c[2])}</div>`).join("")}</div>`).join("");
+  $("#techTable").innerHTML = `<div class="tscroll" style="max-height:none"><table class="t"><tr><th>Tecnología</th><th>Ventajas</th><th>Limitaciones</th><th>Caso de uso en el proyecto</th></tr>${TECH.map(t=>`<tr><td><b>${esc(t[0])}</b></td><td>${esc(t[1])}</td><td>${esc(t[2])}</td><td>${esc(t[3])}</td></tr>`).join("")}</table></div>
+  <p class="hint" style="margin-top:8px"><b>¿Por qué sin frameworks?</b> El requisito es abrir un único archivo sin instalación. React/Vue exigirían un paso de compilación o cargas adicionales, y el código Vanilla deja visible cada etapa del pipeline, lo que favorece el objetivo pedagógico.</p>`;
+  // Diagrama SVG de arquitectura
+  const box = (x,y,w,h,t,s,c) => `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${c}" stroke="#cbd5e1"/><text x="${x+w/2}" y="${y+h/2-4}" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">${t}</text><text x="${x+w/2}" y="${y+h/2+14}" text-anchor="middle" font-size="10.5" fill="#475569">${s}</text></g>`;
+  const ar = (x1,y1,x2,y2,l="") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#2E3A8C" stroke-width="2" marker-end="url(#ah)"/>${l?`<text x="${(x1+x2)/2+6}" y="${(y1+y2)/2-5}" font-size="10" fill="#2E3A8C">${l}</text>`:""}`;
+  $("#archSvg").innerHTML = `<svg viewBox="0 0 980 380" width="100%" style="min-width:760px;font-family:system-ui,sans-serif">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2E3A8C"/></marker></defs>
+    <text x="10" y="20" font-size="11" font-weight="800" fill="#64748b" >Navegador: index.html, sin backend</text>
+    <rect x="4" y="28" width="770" height="344" rx="16" fill="none" stroke="#e2e8f0" stroke-dasharray="6 5"/>
+    ${box(20,48,170,62,"Interfaz de usuario","Formulario · Config.","#FDF4DF")}
+    ${box(20,150,170,62,"Carga de datos","PapaParse · SheetJS","#ECEEF8")}
+    ${box(230,150,170,62,"Recuperación RAG","puntaje · top-k · chunks","#ECEEF8")}
+    ${box(440,150,170,62,"Constructor de prompts","sistema · few-shot · CoT","#ECEEF8")}
+    ${box(440,270,170,62,"Generador","JSON → tarjetas","#ECEEF8")}
+    ${box(230,270,170,62,"Filtros de coherencia","9 verificaciones","#E7F4EC")}
+    ${box(20,270,170,62,"Retroalimentación","valoración · comentarios","#E7F4EC")}
+    ${box(640,48,120,62,"Simulador","Mock LLM local","#f1f5f9")}
+    ${box(800,110,165,62,"LLM gratuitos","Gemini, Groq, OpenRouter","#fff")}
+    ${box(800,200,165,62,"GPT-4o-mini","OpenAI, de pago","#fff")}
+    ${box(800,295,165,62,"Imágenes","Wikipedia, Pollinations","#fff")}
+    <text x="805" y="96" font-size="11" font-weight="800" fill="#64748b">Servicios externos</text>
+    ${ar(105,110,105,150,"CSV/XLSX")}
+    ${ar(190,181,230,181)}
+    ${ar(400,181,440,181,"contexto")}
+    ${ar(190,79,515,150,"preferencias")}
+    ${ar(610,170,800,141)}
+    ${ar(610,190,800,231)}
+    ${ar(610,160,680,110)}
+    ${ar(800,245,612,288,"")}
+    ${ar(610,318,800,326,"fotos")}
+    ${ar(440,301,400,301)}
+    ${ar(230,301,190,301)}
+    <path d="M60 270 C 60 240, 470 250, 500 214" fill="none" stroke="#b45309" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ah)"/>
+    <text x="215" y="263" font-size="10" fill="#b45309">bucle de mejora (feedback + fallos)</text>
+  </svg>`;
+}
+
+
+
+/* ======================================================================
+   INICIALIZACIÓN
+   ====================================================================== */
+function init(){
+  // Conexión guardada (solo si el usuario lo pidió)
+  const saved = store.get("conn");
+  if (saved){ S.remember = true; Object.assign(S.keys, saved.keys||{}); Object.assign(S.models, saved.models||{}); if (PROVIDERS[saved.provider]) S.provider = saved.provider; }
+  const im = store.get("imgMode"); if (im) S.imgMode = im;
+  $("#dRemember").checked = S.remember;
+  $$("#imgModes input").forEach(i=>i.checked = i.value===S.imgMode);
+
+  $("#provider").innerHTML = Object.entries(PROVIDERS).map(([k,v])=>`<option value="${k}">${esc(v.short)}${v.free?" (gratis)":""}</option>`).join("");
+  $("#provs").innerHTML = Object.entries(PROVIDERS).map(([k,v])=>`<label class="prov"><input type="radio" name="prov" value="${k}"><span><b>${esc(v.name)} <span class="tag ${v.free?"g":"y"}">${esc(v.tag)}</span></b><p>${esc(v.note)}</p></span></label>`).join("");
+  $("#interests").innerHTML = Object.entries(INTERESES).map(([k,v])=>`<button type="button" class="chip" data-v="${esc(k)}" aria-pressed="${k==="Cultura e historia"||k==="Gastronomía"}">${v.icon} ${esc(k)}</button>`).join("");
+  $("#restrChips").innerHTML = RESTR.map(([l,v])=>`<button type="button" class="chip" data-v="${esc(v)}" aria-pressed="false">${esc(l)}</button>`).join("");
+  $$(".chip").forEach(c=>c.onclick=()=>c.setAttribute("aria-pressed", c.getAttribute("aria-pressed")!=="true"));
+
+  $("#provider").onchange = e => setProvider(e.target.value);
+  $$("#provs input").forEach(i=>i.onchange = () => setProvider(i.value));
+  $("#apiKey").oninput = e => setKey(e.target.value);
+  $("#dKey").oninput = e => setKey(e.target.value);
+  $("#dModel").oninput = e => { S.models[S.provider] = e.target.value.trim(); refreshStatus(); };
+  $("#dTemp").oninput = e => { S.temp = +e.target.value; $("#dTempV").textContent = S.temp.toFixed(1); };
+  $$("#imgModes input").forEach(i=>i.onchange = () => { S.imgMode = i.value; store.set("imgMode", i.value); setHero($("#dest").value.trim()); renderDestinations(); if (S.cur>=0) renderIt(); });
+  $("#dRemember").onchange = e => { S.remember = e.target.checked; if (!S.remember) store.del("conn"); refreshStatus(); };
+  $("#btnConn").onclick = openDrawer; $("#dClose").onclick = closeDrawer; $("#dDone").onclick = closeDrawer; $("#scrim").onclick = closeDrawer;
+  document.addEventListener("keydown", e => { if (e.key==="Escape" && $("#drawer").classList.contains("on")) closeDrawer(); });
+  $("#btnModels").onclick = listModels;
+  $("#btnTest").onclick = async () => {
+    const out = $("#testOut");
+    if (!hasKey()){ out.textContent = "Primero pega una API Key."; return; }
+    $("#btnTest").disabled = true; out.textContent = "Probando…";
+    try { await callLLM("Responde solo con la palabra OK.", "Prueba de conexión", false); refreshStatus(null); out.textContent = `Conexión verificada con ${P().name} (${S.models[S.provider]}).`; }
+    catch(e){ refreshStatus(e.message); out.textContent = "Error: " + e.message; }
+    finally { $("#btnTest").disabled = false; }
+  };
+
+  $$(".tabs button").forEach(b=>b.onclick=()=>showView(b.dataset.view));
+  $("#home").onclick = e => { e.preventDefault(); showView("plan"); };
+  $("#dest").addEventListener("input", onDestChange);
+  $("#budget").onchange = () => { budgetHint(); fitWidth($("#budget"), 12); };
+  const setBar = () => document.documentElement.style.setProperty("--barh", $(".bar").offsetHeight + "px");
+  setBar(); window.addEventListener("resize", () => { setBar(); fitAll(); });
+  document.fonts?.ready.then(fitAll);
+
+  const kb = $("#kb"), file = $("#file");
+  $("#btnFile").onclick = () => file.click();
+  file.onchange = () => { handleFile(file.files[0]); file.value=""; };
+  ["dragenter","dragover"].forEach(ev=>kb.addEventListener(ev, e=>{e.preventDefault(); kb.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>kb.addEventListener(ev, e=>{e.preventDefault(); kb.classList.remove("over");}));
+  kb.addEventListener("drop", e=>handleFile(e.dataTransfer.files[0]));
+  $("#btnSample").onclick = loadSample;
+  $("#btnDlCsv").onclick = () => download("destinos_turisticos.csv", "﻿"+sampleCSV(), "text/csv;charset=utf-8");
+
+  $("#btnOnlyRag").onclick = () => { const p=getPrefs(); if(!p.destino||!S.data.length){toast("Indica un destino y carga datos.");return;} S.retrieval=retrieve(p); renderRag(); };
+  $("#btnBuildPrompt").onclick = () => { const p=getPrefs(); if(!p.destino||!S.data.length){toast("Indica un destino y carga datos.");return;} S.retrieval=retrieve(p); renderRag(); S.prompt=buildPrompt(p,S.retrieval); renderPrompt(); };
+  $("#btnCopy").onclick = () => { if(!S.prompt){toast("Primero construye el prompt.");return;} navigator.clipboard?.writeText("SYSTEM:\n"+S.prompt.system+"\n\nUSER:\n"+S.prompt.user).then(()=>toast("Prompt copiado"), ()=>toast("No se pudo copiar")); };
+  $("#btnPrintDoc")?.addEventListener("click", () => window.print());
+
+  renderDocs(); setProvider(S.provider); budgetHint();
+  loadSample(true); onDestChange(); fitAll();
+
+  // Modo impresión de documentación: index.html#print=memoria | #print=arquitectura
+  const m = location.hash.match(/print=(\w+)/);
+  if (m){
+    document.body.classList.add("print-mode"); showView("doc");
+    $$(".doc-part").forEach(d=>d.classList.toggle("pshow", d.dataset.part.split(" ").includes(m[1])));
+    $$("details.ph").forEach(d=>d.open=true);
+    $("#printTitle").innerHTML = `<h1 style="font-size:1.8rem">ViajeIA: ${m[1]==="arquitectura"?"arquitectura de la solución":"memoria técnica"}</h1><p class="muted" style="margin:0">Planificador de viajes personalizado con LLM, RAG y prompt engineering. Prototipo académico.</p>`;
+  }
+  window.addEventListener("beforeprint", ()=>$$("details.ph").forEach(d=>d.open=true));
+}
+init();
+</script>
+</body>
+</html>
